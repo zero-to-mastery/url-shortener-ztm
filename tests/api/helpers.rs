@@ -1,10 +1,12 @@
 // tests/api/helpers.rs
 
 // dependencies
+use sqlx::SqlitePool;
 use std::sync::LazyLock;
 use url_shortener_ztm_lib::get_configuration;
-use url_shortener_ztm_lib::startup::Application;
+use url_shortener_ztm_lib::startup::{Application, get_connection_pool};
 use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
+use uuid::Uuid;
 
 // set up a static variable for the tracing configuration
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -23,7 +25,9 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 pub struct TestApp {
     pub address: String,
     pub _port: u16,
-    pub _api_client: reqwest::Client,
+    pub client: reqwest::Client,
+    pub pool: SqlitePool,
+    pub api_key: Uuid,
 }
 
 // Spin up an instance of our application and returns its address (i.e. http://localhost:XXXX)
@@ -33,8 +37,18 @@ pub async fn spawn_app() -> TestApp {
     let configuration = {
         let mut c = get_configuration().expect("Failed to read configuration");
         c.application.port = 0;
+        c.database.database_path = "sqlite::memory:".to_string();
         c
     };
+
+    let pool = get_connection_pool(&configuration.database);
+
+    sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("Failed to migrate the database");
+
+    let api_key = configuration.application.api_key;
 
     let application = Application::build(configuration.clone())
         .await
@@ -50,6 +64,8 @@ pub async fn spawn_app() -> TestApp {
     TestApp {
         address: format!("http://127.0.0.1:{}", application_port),
         _port: application_port,
-        _api_client: client,
+        client,
+        pool,
+        api_key,
     }
 }

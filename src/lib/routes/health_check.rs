@@ -1,9 +1,9 @@
 // src/lib/routes/health_check.rs
 
 // dependencies
-use axum::{http::StatusCode, response::IntoResponse};
+use crate::response::ApiResponse;
 
-// health_check handler
-pub async fn health_check() -> impl IntoResponse {
-    StatusCode::OK
+// handler function for the health check endpoint
+pub async fn health_check() -> ApiResponse<()> {
+    ApiResponse::success(())
 }

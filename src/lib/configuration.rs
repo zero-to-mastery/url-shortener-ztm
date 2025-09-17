@@ -7,11 +7,13 @@ use figment::{
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
+use uuid::Uuid;
 
 // struct type to represent the general settings
 #[derive(Clone, Deserialize)]
 pub struct Settings {
     pub application: ApplicationSettings,
+    pub database: DatabaseSettings,
 }
 
 // struct type to represent individual Application settings
@@ -20,6 +22,23 @@ pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
+    pub api_key: Uuid,
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct DatabaseSettings {
+    pub database_path: String,
+    pub create_if_missing: bool,
+}
+
+impl DatabaseSettings {
+    pub fn connection_string(&self) -> String {
+        if self.database_path == ":memory:" {
+            "sqlite::memory:".to_string()
+        } else {
+            format!("sqlite:{}", self.database_path)
+        }
+    }
 }
 
 // enum type to represent the runtime environment

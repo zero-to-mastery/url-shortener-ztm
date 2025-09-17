@@ -9,6 +9,7 @@ use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // initialize tracing
+    tracing::info!("Initializing tracing...");
     let subscriber = get_subscriber(
         "axum-api-template-server".into(),
         "info".into(),
@@ -17,9 +18,11 @@ async fn main() -> anyhow::Result<()> {
     init_subscriber(subscriber);
 
     // read in the app configuration
+    tracing::info!("Reading configuration...");
     let configuration = get_configuration().expect("Failed to read configuration files.");
 
     // build an instance of the application and run it
+    tracing::info!("Starting up the application...");
     let application = Application::build(configuration.clone()).await?;
     application.run_until_stopped().await?;
 

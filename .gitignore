@@ -8,3 +8,5 @@
 
 # build artifacts
 /target
+
+# SQLite database files
