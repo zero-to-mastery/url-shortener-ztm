@@ -1,0 +1,10 @@
+# .gitignore configuration
+
+# VS code settings
+.vscode
+
+# environment variables
+.env
+
+# build artifacts
+/target
