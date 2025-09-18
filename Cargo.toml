@@ -1,6 +1,6 @@
 [package]
 name = "url-shortener-ztm"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2024"
 
 [[bin]]
@@ -13,6 +13,7 @@ path = "src/lib/lib.rs"
 
 [dependencies]
 anyhow = "1.0.98"
+async-trait = "0.1.89"
 axum = "0.8.4"
 axum-extra = { version = "0.10.1", features = [ "typed-header" ] }
 axum-macros = "0.5.0"

@@ -1,13 +1,14 @@
 // src/lib/state.rs
 
 // dependencies
-use sqlx::SqlitePool;
+use crate::database::UrlDatabase;
+use std::sync::Arc;
 use uuid::Uuid;
 
 // struct type to represent the application state
 #[derive(Clone)]
 pub struct AppState {
-    pub pool: SqlitePool,
+    pub database: Arc<dyn UrlDatabase>,
     pub api_key: Uuid,
     pub template_dir: String,
 }
@@ -15,9 +16,9 @@ pub struct AppState {
 // methods to build the application state
 impl AppState {
     // Create a new application state instance
-    pub fn new(pool: SqlitePool, api_key: Uuid, template_dir: String) -> Self {
+    pub fn new(database: Arc<dyn UrlDatabase>, api_key: Uuid, template_dir: String) -> Self {
         Self {
-            pool,
+            database,
             api_key,
             template_dir,
         }

@@ -16,10 +16,9 @@ async fn redirect_endpoint_sends_user_to_shortened_destination_url() {
     let test_id = "tst123";
     let test_url = "https://www.google.com";
 
-    sqlx::query("INSERT INTO urls (id, url) VALUES (?, ?);")
-        .bind(test_id)
-        .bind(test_url)
-        .execute(&app.pool)
+    // Insert the test data into the database
+    app.database
+        .insert_url(test_id, test_url)
         .await
         .expect("Failed to insert test data into database");
 

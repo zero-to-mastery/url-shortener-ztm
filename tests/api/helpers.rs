@@ -1,10 +1,11 @@
 // tests/api/helpers.rs
 
 // dependencies
-use sqlx::SqlitePool;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
+use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
 use url_shortener_ztm_lib::get_configuration;
-use url_shortener_ztm_lib::startup::{Application, get_connection_pool};
+use url_shortener_ztm_lib::startup::build_router;
+use url_shortener_ztm_lib::state::AppState;
 use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
 use uuid::Uuid;
 
@@ -26,14 +27,16 @@ pub struct TestApp {
     pub address: String,
     pub _port: u16,
     pub client: reqwest::Client,
-    pub pool: SqlitePool,
+    pub database: Arc<dyn UrlDatabase>,
     pub api_key: Uuid,
 }
 
 // Spin up an instance of our application and returns its address (i.e. http://localhost:XXXX)
 pub async fn spawn_app() -> TestApp {
+    // Ensure that the tracing is only initialized once
     LazyLock::force(&TRACING);
 
+    // Randomise configuration to ensure test isolation
     let configuration = {
         let mut c = get_configuration().expect("Failed to read configuration");
         c.application.port = 0;
@@ -41,31 +44,48 @@ pub async fn spawn_app() -> TestApp {
         c
     };
 
-    let pool = get_connection_pool(&configuration.database);
-
-    sqlx::migrate!("./migrations")
-        .run(&pool)
+    // Create database and run migrations
+    let sqlite_db = SqliteUrlDatabase::from_config(&configuration.database)
         .await
-        .expect("Failed to migrate the database");
+        .expect("Failed to create database");
+    sqlite_db.migrate().await.expect("Failed to run migrations");
+    let database = Arc::new(sqlite_db);
 
+    // Store the API key for use in tests
     let api_key = configuration.application.api_key;
 
-    let application = Application::build(configuration.clone())
+    let test_app_state = AppState {
+        database: database.clone(),
+        api_key,
+        template_dir: configuration.application.templates,
+    };
+
+    // Launch the application as a background task
+    let test_app = build_router(test_app_state.clone())
         .await
         .expect("Failed to build application.");
-    let application_port = application.port();
-    tokio::spawn(application.run_until_stopped());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind random port");
+    let test_app_port = listener.local_addr().unwrap().port();
 
+    tokio::spawn(async move {
+        axum::serve(listener, test_app)
+            .await
+            .expect("Failed to serve application")
+    });
+
+    // Create an HTTP client for making requests to the application
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .expect("Failed to build reqwest client.");
 
     TestApp {
-        address: format!("http://127.0.0.1:{}", application_port),
-        _port: application_port,
+        address: format!("http://127.0.0.1:{}", test_app_port),
+        _port: test_app_port,
         client,
-        pool,
+        database,
         api_key,
     }
 }

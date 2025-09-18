@@ -3,7 +3,8 @@
 // contains all the startup and configuration logic for the application
 
 // dependencies
-use crate::configuration::{DatabaseSettings, Settings};
+use crate::configuration::Settings;
+use crate::database::SqliteUrlDatabase;
 use crate::middleware::check_api_key;
 use crate::routes::{get_index, get_redirect, health_check, post_shorten};
 use crate::state::AppState;
@@ -15,7 +16,7 @@ use axum::{
     middleware::from_fn_with_state,
     routing::{get, post},
 };
-use sqlx::SqlitePool;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower::ServiceBuilder;
@@ -65,11 +66,8 @@ impl Application {
     // builds the router for the application
     pub async fn build(config: Settings) -> Result<Self, anyhow::Error> {
         // set up the database connection pool and run migrations
-        let db_pool = get_connection_pool(&config.database);
-        sqlx::migrate!("./migrations")
-            .run(&db_pool)
-            .await
-            .context("Failed to migrate the database.")?;
+        let database = Arc::new(SqliteUrlDatabase::from_config(&config.database).await?);
+        database.migrate().await?;
 
         // set up the TCP listener and application state
         let api_key = config.application.api_key;
@@ -79,7 +77,7 @@ impl Application {
             .await
             .context("Unable to obtain a TCP listener...")?;
         let port = listener.local_addr()?.port();
-        let state = AppState::new(db_pool, api_key, template_dir);
+        let state = AppState::new(database, api_key, template_dir);
 
         // build the application router, passing in the application state
         let router = build_router(state.clone())
@@ -107,12 +105,6 @@ impl Application {
             .context("Unable to start the app server...")?;
         Ok(())
     }
-}
-
-// function to get a database connection pool
-pub fn get_connection_pool(config: &DatabaseSettings) -> SqlitePool {
-    SqlitePool::connect_lazy(config.connection_string().as_str())
-        .expect("Failed to create the database connection pool.")
 }
 
 // function which configures and creates the application router
