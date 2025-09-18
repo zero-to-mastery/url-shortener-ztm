@@ -44,9 +44,9 @@ pub async fn spawn_app() -> TestApp {
     let pool = get_connection_pool(&configuration.database);
 
     sqlx::migrate!("./migrations")
-            .run(&pool)
-            .await
-            .expect("Failed to migrate the database");
+        .run(&pool)
+        .await
+        .expect("Failed to migrate the database");
 
     let api_key = configuration.application.api_key;
 

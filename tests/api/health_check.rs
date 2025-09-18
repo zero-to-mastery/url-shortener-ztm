@@ -13,7 +13,7 @@ async fn health_check_returns_200_ok_and_json_envelope() {
     // Act
     let response = app
         .client
-        .get(format!("{}/health_check", &app.address))
+        .get(format!("{}/api/health_check", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");

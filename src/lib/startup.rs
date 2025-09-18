@@ -5,17 +5,23 @@
 // dependencies
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::middleware::check_api_key;
-use crate::routes::{get_redirect, health_check, post_shorten};
+use crate::routes::{get_index, get_redirect, health_check, post_shorten};
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use anyhow::{Context, Result};
-use axum::{Router, http::HeaderName, middleware::from_fn_with_state, routing::{get, post}};
+use axum::{
+    Router,
+    http::HeaderName,
+    middleware::from_fn_with_state,
+    routing::{get, post},
+};
 use sqlx::SqlitePool;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower::ServiceBuilder;
 use tower_http::{
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
+    services::ServeDir,
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
 };
 use tracing::Level;
@@ -58,7 +64,6 @@ pub struct Application {
 impl Application {
     // builds the router for the application
     pub async fn build(config: Settings) -> Result<Self, anyhow::Error> {
-        
         // set up the database connection pool and run migrations
         let db_pool = get_connection_pool(&config.database);
         sqlx::migrate!("./migrations")
@@ -121,16 +126,17 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .on_response(DefaultOnResponse::new().include_headers(true));
     let x_request_id = HeaderName::from_static("x-request-id");
 
-    
     let secure_api = Router::new()
-            .route("/", post(post_shorten))
-            .route_layer(from_fn_with_state(state.clone(), check_api_key));
+        .route("/api/shorten", post(post_shorten))
+        .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
     // build the router with tracing
     let router = Router::new()
-        .route("/health_check", get(health_check))
-        .route("/{id}", get(get_redirect))
+        .route("/api/health_check", get(health_check))
+        .route("/api/redirect/{id}", get(get_redirect))
+        .route("/admin", get(get_index))
         .merge(secure_api)
+        .fallback_service(ServeDir::new("static"))
         .with_state(state)
         .layer(
             ServiceBuilder::new()

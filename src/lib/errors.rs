@@ -28,6 +28,9 @@ pub enum ApiError {
 
     #[error("Unprocessable entity: {0}")]
     Unprocessable(String),
+
+    #[error(transparent)]
+    Tera(#[from] tera::Error),
 }
 
 // implement the IntoResponse trait for the ApiError type
@@ -41,6 +44,10 @@ impl IntoResponse for ApiError {
             ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg),
             ApiError::Unprocessable(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
             ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            ApiError::Tera(msg) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Tera template rendering error: {msg}"),
+            ),
         };
 
         ApiResponse::<()>::error(&message, status).into_response()

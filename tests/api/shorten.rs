@@ -17,7 +17,7 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
     // Act
     let response = app
         .client
-        .post(format!("{}/", &app.address))
+        .post(format!("{}/api/shorten", &app.address))
         .header("x-api-key", app.api_key.to_string())
         .body(url)
         .send()

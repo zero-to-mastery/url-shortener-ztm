@@ -26,7 +26,7 @@ async fn redirect_endpoint_sends_user_to_shortened_destination_url() {
     // Act
     let response = app
         .client
-        .get(format!("{}/{}", &app.address, test_id))
+        .get(format!("{}/api/redirect/{}", &app.address, test_id))
         .send()
         .await
         .expect("Failed to execute request");

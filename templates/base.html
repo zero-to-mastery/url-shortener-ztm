@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" type="text/css" href="screen.css" media="screen" />
+  <title>{{ title }} | {{ page }}</title>
+</head>
+<body>
+  <h1>URL Shortener</h1>
+  <main>
+    {% block content %}{% endblock content %}
+  </main>
+  <footer>
+    <p>&copy; <span id="year"></span><noscript>2025</noscript> Jeffery D Mitchell | All Rights Reserved</p>
+  </footer>
+  <script type="module" src="scripts.js"></script>
+</body>
+</html>

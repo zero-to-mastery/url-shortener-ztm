@@ -11,6 +11,7 @@ pub mod routes;
 pub mod startup;
 pub mod state;
 pub mod telemetry;
+pub mod templates;
 
 // re-exports
 pub use configuration::*;
@@ -20,3 +21,4 @@ pub use response::*;
 pub use startup::*;
 pub use state::*;
 pub use telemetry::*;
+pub use templates::*;
