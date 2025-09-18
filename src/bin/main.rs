@@ -17,9 +17,10 @@ async fn main() -> anyhow::Result<()> {
     );
     init_subscriber(subscriber);
 
-    // read in the app configuration
+    // read in the app configuration and log it
     tracing::info!("Reading configuration...");
     let configuration = get_configuration().expect("Failed to read configuration files.");
+    tracing::info!("Configuration: {:?}", configuration);
 
     // build an instance of the application and run it
     tracing::info!("Starting up the application...");

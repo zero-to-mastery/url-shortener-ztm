@@ -7,17 +7,37 @@ use figment::{
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
+use std::fmt;
 use uuid::Uuid;
 
 // struct type to represent the general settings
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Settings {
     pub application: ApplicationSettings,
     pub database: DatabaseSettings,
 }
 
+// implement the Display trait for the Settings struct
+impl fmt::Display for Settings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Application Settings:")?;
+        writeln!(f, "  Host: {}", self.application.host)?;
+        writeln!(f, "  Port: {}", self.application.port)?;
+        writeln!(f, "  API Key: {}", self.application.api_key)?;
+        writeln!(f, "  Templates: {}", self.application.templates)?;
+        writeln!(f, "Database Settings:")?;
+        writeln!(f, "  Database Path: {}", self.database.database_path)?;
+        writeln!(
+            f,
+            "  Create if Missing: {}",
+            self.database.create_if_missing
+        )?;
+        Ok(())
+    }
+}
+
 // struct type to represent individual Application settings
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
@@ -26,7 +46,7 @@ pub struct ApplicationSettings {
     pub templates: String,
 }
 
-#[derive(serde::Deserialize, Clone)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct DatabaseSettings {
     pub database_path: String,
     pub create_if_missing: bool,
