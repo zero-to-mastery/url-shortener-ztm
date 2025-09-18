@@ -73,12 +73,13 @@ impl Application {
 
         // set up the TCP listener and application state
         let api_key = config.application.api_key;
+        let template_dir = config.application.templates;
         let address = format!("{}:{}", config.application.host, config.application.port);
         let listener = TcpListener::bind(address)
             .await
             .context("Unable to obtain a TCP listener...")?;
         let port = listener.local_addr()?.port();
-        let state = AppState::new(db_pool, api_key);
+        let state = AppState::new(db_pool, api_key, template_dir);
 
         // build the application router, passing in the application state
         let router = build_router(state.clone())

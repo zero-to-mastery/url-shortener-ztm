@@ -23,6 +23,7 @@ pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,
     pub api_key: Uuid,
+    pub templates: String,
 }
 
 #[derive(serde::Deserialize, Clone)]
