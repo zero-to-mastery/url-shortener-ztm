@@ -63,6 +63,7 @@ impl DatabaseSettings {
 }
 
 // enum type to represent the runtime environment
+#[derive(Clone, Debug)]
 pub enum Environment {
     Local,
     Production,
@@ -104,10 +105,10 @@ pub fn get_configuration() -> Result<Settings, Box<figment::Error>> {
         .try_into()
         .expect("Failed to parse APP_ENVIRONMENT");
 
-    let environment_filename = format!("{}.yaml", environment.as_str());
+    let environment_filename = format!("{}.yml", environment.as_str());
 
     let settings: Settings = Figment::new()
-        .merge(Yaml::file(configuration_directory.join("base.yaml")))
+        .merge(Yaml::file(configuration_directory.join("base.yml")))
         .merge(Yaml::file(
             configuration_directory.join(environment_filename),
         ))

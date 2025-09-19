@@ -1,12 +1,13 @@
 // src/lib/state.rs
 
 // dependencies
+use axum_macros::FromRef;
 use crate::database::UrlDatabase;
 use std::sync::Arc;
 use uuid::Uuid;
 
 // struct type to represent the application state
-#[derive(Clone)]
+#[derive(Clone, FromRef)]
 pub struct AppState {
     pub database: Arc<dyn UrlDatabase>,
     pub api_key: Uuid,

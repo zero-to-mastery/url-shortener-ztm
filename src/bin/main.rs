@@ -1,11 +1,13 @@
 // src/main.rs
 
+// the application's main entry point
+
 // dependencies
 use url_shortener_ztm_lib::configuration::get_configuration;
 use url_shortener_ztm_lib::startup::Application;
 use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
 
-// main function, program entry point
+/// main function, program entry point
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // initialize tracing
