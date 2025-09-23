@@ -1,8 +1,8 @@
 // src/lib/state.rs
 
 // dependencies
-use axum_macros::FromRef;
 use crate::database::UrlDatabase;
+use axum_macros::FromRef;
 use std::sync::Arc;
 use uuid::Uuid;
 
