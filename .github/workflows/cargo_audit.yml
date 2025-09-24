@@ -1,0 +1,48 @@
+# .github/workflows/cargo_audit.yml
+name: Security Audit
+
+on:
+  # Run on pushes and PRs to all branches.
+  push:
+    branches: ['*']
+  pull_request:
+
+jobs:
+  audit:
+    name: Run cargo-audit
+    runs-on: ubuntu-latest          # Uses the latest Ubuntu runner.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4   # Pulls your code into the runner.
+
+      - name: Install Rust (stable)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rust-version: stable     # Adjust if you need a specific channel.
+
+      - name: Cache Cargo registry & index
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install cargo-audit
+        run: rustup component add clippy  # Just to ensure we have the toolchain tools.
+        # Note: cargo‑audit is a Cargo subcommand, so it comes with `rustup`.
+        # If you prefer a specific version:
+        #   run: cargo install cargo-audit --version 0.18.2
+
+      - name: Run audit
+        run: cargo audit --deny warnings  # Fail if any advisory is found.
+
+      - name: Upload advisory report (optional)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-audit-report
+          path: ./target/debug/audit.txt   # Adjust path if you generate a file.
