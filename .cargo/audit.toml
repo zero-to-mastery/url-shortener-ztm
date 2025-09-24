@@ -1,0 +1,5 @@
+[advisories]
+# we're ignoring persistent advisorty "RUSTSEC-2023-0071", related to the `rsa` crate, version 0.9.8. There is no available fix
+ignore = [
+  "RUSTSEC-2023-0071"
+]
