@@ -10,39 +10,54 @@ on:
 jobs:
   audit:
     name: Run cargo-audit
-    runs-on: ubuntu-latest          # Uses the latest Ubuntu runner.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4   # Pulls your code into the runner.
+        uses: actions/checkout@v4
 
       - name: Install Rust (stable)
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          rust-version: stable     # Adjust if you need a specific channel.
+          toolchain: stable
 
       - name: Cache Cargo registry & index
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Cache cargo-audit
+        uses: actions/cache@v4
+        id: cache-cargo-audit
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit
+
       - name: Install cargo-audit
-        run: rustup component add clippy  # Just to ensure we have the toolchain tools.
-        # Note: cargo‑audit is a Cargo subcommand, so it comes with `rustup`.
-        # If you prefer a specific version:
-        #   run: cargo install cargo-audit --version 0.18.2
+        if: steps.cache-cargo-audit.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked
 
       - name: Run audit
-        run: cargo audit --deny warnings  # Fail if any advisory is found.
+        run: cargo audit --deny warnings
 
       - name: Upload advisory report (optional)
+        if: failure()
+        run: |
+          cargo audit --json > audit-report.json || true
+          cargo audit > audit-report.txt || true
+        continue-on-error: true
+
+      - name: Upload audit artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: cargo-audit-report
-          path: ./target/debug/audit.txt   # Adjust path if you generate a file.
+          path: |
+            audit-report.json
+            audit-report.txt
