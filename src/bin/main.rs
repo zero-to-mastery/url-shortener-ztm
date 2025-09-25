@@ -12,14 +12,10 @@ use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
 async fn main() -> anyhow::Result<()> {
     // initialize tracing
     tracing::info!("Initializing tracing...");
-    let subscriber = get_subscriber(
-        "axum-api-template-server".into(),
-        "info".into(),
-        std::io::stdout,
-    );
+    let subscriber = get_subscriber("url-shortener-ztm".into(), "info".into(), std::io::stdout);
     init_subscriber(subscriber);
 
-    // read in the app configuration and log it
+    // read in the app configuration and log it, panic if the configuration can't be read
     tracing::info!("Reading configuration...");
     let configuration = get_configuration().expect("Failed to read configuration files.");
     tracing::info!("Configuration: {:?}", configuration);

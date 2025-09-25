@@ -11,11 +11,10 @@ use axum::{
     response::{IntoResponse, Redirect},
 };
 use axum_macros::debug_handler;
-use tracing::instrument;
 
 // redirect endpoint handler
 #[debug_handler]
-#[instrument(name = "redirect" skip(state))]
+#[tracing::instrument(name = "redirect" skip(state))]
 pub async fn get_redirect(
     State(state): State<AppState>,
     Path(id): Path<String>,

@@ -52,7 +52,7 @@ async fn shutdown_signal() {
     }
 }
 
-// struct type to represent the application, wraps an Axum Router type
+// struct type to represent the application, includes port, listener, router and state fields
 #[allow(dead_code)]
 pub struct Application {
     port: u16,
@@ -118,17 +118,26 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         )
         .on_response(DefaultOnResponse::new().include_headers(true));
     let x_request_id = HeaderName::from_static("x-request-id");
-
+    
+    // build the secure API (protected by the API key checking middleware)
     let secure_api = Router::new()
         .route("/api/shorten", post(post_shorten))
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
-    // build the router with tracing
-    let router = Router::new()
+    // build the public routes
+    let public_api = Router::new()
         .route("/api/health_check", get(health_check))
-        .route("/api/redirect/{id}", get(get_redirect))
-        .route("/admin", get(get_index))
+        .route("/api/redirect/{id}", get(get_redirect));
+
+    // build the admin panel routes
+    let admin_panel = Router::new()
+        .route("/admin", get(get_index));
+
+    // build the router by merging the secure and public routes, along with the admin panel routes, with tracing
+    let router = Router::new()
+        .merge(public_api)
         .merge(secure_api)
+        .merge(admin_panel)
         .fallback_service(ServeDir::new("static"))
         .with_state(state)
         .layer(
