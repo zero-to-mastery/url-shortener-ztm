@@ -1,6 +1,6 @@
 [package]
 name = "url-shortener-ztm"
-version = "0.4.10"
+version = "0.4.11"
 edition = "2024"
 
 [[bin]]
@@ -9,7 +9,6 @@ path = "src/bin/main.rs"
 
 [lib]
 name = "url_shortener_ztm_lib"
-path = "src/lib/lib.rs"
 
 [dependencies]
 anyhow = "1.0.100"

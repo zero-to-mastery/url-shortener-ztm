@@ -6,7 +6,9 @@
 # environment variables
 .env
 
+# system files
+.DS_Store
+/src/.DS_Store
+
 # build artifacts
 /target
-
-# SQLite database files

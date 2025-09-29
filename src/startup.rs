@@ -118,7 +118,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         )
         .on_response(DefaultOnResponse::new().include_headers(true));
     let x_request_id = HeaderName::from_static("x-request-id");
-    
+
     // build the secure API (protected by the API key checking middleware)
     let secure_api = Router::new()
         .route("/api/shorten", post(post_shorten))
@@ -130,8 +130,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .route("/api/redirect/{id}", get(get_redirect));
 
     // build the admin panel routes
-    let admin_panel = Router::new()
-        .route("/admin", get(get_index));
+    let admin_panel = Router::new().route("/admin", get(get_index));
 
     // build the router by merging the secure and public routes, along with the admin panel routes, with tracing
     let router = Router::new()
