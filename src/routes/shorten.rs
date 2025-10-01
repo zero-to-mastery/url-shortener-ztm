@@ -25,7 +25,7 @@ pub async fn post_shorten(
         tracing::error!("Unable to parse URL");
         ApiError::Unprocessable(e.to_string())
     })?;
-    let host = header.hostname();
+    let host = "localhost";
 
     match state.database.insert_url(id, p_url.as_str()).await {
         Ok(()) => {

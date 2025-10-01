@@ -127,7 +127,8 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
     // build the public routes
     let public_api = Router::new()
         .route("/api/health_check", get(health_check))
-        .route("/api/redirect/{id}", get(get_redirect));
+        .route("/api/redirect/{id}", get(get_redirect))
+        .route("/api/public/shorten", post(post_shorten));
 
     // build the admin panel routes
     let admin_panel = Router::new().route("/admin", get(get_index));
