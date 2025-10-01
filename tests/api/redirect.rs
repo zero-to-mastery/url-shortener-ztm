@@ -4,7 +4,7 @@
 // this endpoint should redirect the user to the shortened URL
 
 // dependencies
-use crate::helpers::spawn_app;
+use crate::helpers::{assert_redirect_to, spawn_app};
 use axum::http::StatusCode;
 
 #[tokio::test]
@@ -23,20 +23,8 @@ async fn redirect_endpoint_sends_user_to_shortened_destination_url() {
         .expect("Failed to insert test data into database");
 
     // Act
-    let response = app
-        .client
-        .get(format!("{}/api/redirect/{}", &app.address, test_id))
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = app.get_api(&format!("/api/redirect/{}", test_id)).await;
 
     // Assert
-    assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
-
-    let location_header = response
-        .headers()
-        .get("location")
-        .expect("No location header found in response");
-
-    assert_eq!(location_header, test_url);
+    assert_redirect_to(response, test_url, StatusCode::PERMANENT_REDIRECT).await;
 }

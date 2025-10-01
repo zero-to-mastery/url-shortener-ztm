@@ -12,3 +12,8 @@
 
 # build artifacts
 /target
+
+
+# Ignore local DBs and weird files
+*.db
+NUL

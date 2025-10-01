@@ -15,14 +15,7 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
     let url = r#"https://www.google.ca"#;
 
     // Act
-    let response = app
-        .client
-        .post(format!("{}/api/shorten", &app.address))
-        .header("x-api-key", app.api_key.to_string())
-        .body(url)
-        .send()
-        .await
-        .expect("Failed to execute request");
+    let response = app.post_api_with_key("/api/shorten", url).await;
 
     // Assert
     assert_eq!(response.status(), StatusCode::OK);

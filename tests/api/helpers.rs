@@ -1,6 +1,9 @@
 // tests/api/helpers.rs
 
 // dependencies
+use axum::http::StatusCode;
+use reqwest::header::CONTENT_TYPE;
+use serde_json::Value;
 use std::sync::{Arc, LazyLock};
 use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
 use url_shortener_ztm_lib::get_configuration;
@@ -88,4 +91,102 @@ pub async fn spawn_app() -> TestApp {
         database,
         api_key,
     }
+}
+
+// convenience helpers to reduce boilerplate in tests
+impl TestApp {
+    // Build a full URL from a path
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.address, path)
+    }
+
+    // Build a full API URL from an API path
+    pub fn api(&self, path: &str) -> String {
+        if path.starts_with("/api/") {
+            self.url(path)
+        } else {
+            self.url(&format!("/api/{}", path))
+        }
+    }
+
+    // Simple GET request
+    #[allow(dead_code)]
+    pub async fn get(&self, path: &str) -> reqwest::Response {
+        self.client
+            .get(self.url(path))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    // Simple API GET request
+    pub async fn get_api(&self, path: &str) -> reqwest::Response {
+        self.client
+            .get(self.api(path))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    // POST raw body to API path
+    #[allow(dead_code)]
+    pub async fn post_api_body(&self, path: &str, body: impl Into<String>) -> reqwest::Response {
+        self.client
+            .post(self.api(path))
+            .body(body.into())
+            .send()
+            .await
+            .expect("Failed to execute POST request")
+    }
+
+    // Authenticated POST with API key header
+    pub async fn post_api_with_key(
+        &self,
+        path: &str,
+        body: impl Into<String>,
+    ) -> reqwest::Response {
+        self.client
+            .post(self.api(path))
+            .header("x-api-key", self.api_key.to_string())
+            .body(body.into())
+            .send()
+            .await
+            .expect("Failed to execute POST request")
+    }
+}
+
+// Assertion helpers
+pub async fn assert_json_ok(response: reqwest::Response) -> Value {
+    assert!(response.status().is_success());
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let ct = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert!(ct.starts_with("application/json"));
+
+    let body: Value = response.json().await.expect("Response was not valid JSON");
+
+    assert_eq!(body.get("success").and_then(Value::as_bool), Some(true));
+    assert_eq!(body.get("message").and_then(Value::as_str), Some("ok"));
+    assert_eq!(body.get("status").and_then(Value::as_u64), Some(200));
+    assert!(body.get("time").and_then(Value::as_str).is_some());
+    assert!(body.get("data").is_some());
+
+    body
+}
+
+pub async fn assert_redirect_to(
+    response: reqwest::Response,
+    expected_location: &str,
+    status: StatusCode,
+) {
+    assert_eq!(response.status(), status);
+    let location_header = response
+        .headers()
+        .get("location")
+        .expect("No location header found in response");
+    assert_eq!(location_header, expected_location);
 }
