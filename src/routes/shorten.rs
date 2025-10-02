@@ -34,7 +34,7 @@ use url::Url;
 ///
 /// The request body should contain the URL to shorten as plain text:
 ///
-/// ```
+/// ```text
 /// https://www.example.com/very/long/url/with/many/parameters
 /// ```
 ///
@@ -42,7 +42,7 @@ use url::Url;
 ///
 /// Returns the shortened URL as plain text:
 ///
-/// ```
+/// ```text
 /// https://localhost:8000/AbC123
 /// ```
 ///

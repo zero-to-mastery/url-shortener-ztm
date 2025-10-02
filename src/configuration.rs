@@ -239,12 +239,15 @@ impl TryFrom<String> for Environment {
 /// ```rust,no_run
 /// use url_shortener_ztm_lib::configuration::get_configuration;
 ///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Load configuration with default environment (local)
 /// let config = get_configuration()?;
 ///
 /// // Load configuration with custom environment
-/// std::env::set_var("APP_ENVIRONMENT", "production");
+/// unsafe { std::env::set_var("APP_ENVIRONMENT", "production"); }
 /// let config = get_configuration()?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn get_configuration() -> Result<Settings, Box<figment::Error>> {
     let base_path = std::env::current_dir().expect("Failed to determine the current directory");

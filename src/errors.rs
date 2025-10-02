@@ -174,17 +174,10 @@ impl std::fmt::Debug for ApiError {
 ///
 /// Returns `fmt::Result` indicating success or failure of the formatting operation.
 ///
-/// # Examples
+/// # Internal Usage
 ///
-/// ```rust
-/// use url_shortener_ztm_lib::errors::error_chain_fmt;
-/// use std::fmt;
-///
-/// let error = std::io::Error::new(std::io::ErrorKind::NotFound, "File not found");
-/// let mut output = String::new();
-/// let mut formatter = fmt::Formatter::new(&mut output);
-/// error_chain_fmt(&error, &mut formatter);
-/// ```
+/// This function is used internally by the `Debug` implementation for `ApiError`
+/// and is not intended for direct use by library consumers.
 pub fn error_chain_fmt(
     e: &impl std::error::Error,
     f: &mut std::fmt::Formatter<'_>,

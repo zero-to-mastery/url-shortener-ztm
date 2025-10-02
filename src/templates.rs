@@ -28,6 +28,17 @@
 //! use tera::Context;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! use url_shortener_ztm_lib::database::SqliteUrlDatabase;
+//! use url_shortener_ztm_lib::configuration::DatabaseSettings;
+//! use std::sync::Arc;
+//! use uuid::Uuid;
+//!
+//! let config = DatabaseSettings {
+//!     database_path: "database.db".to_string(),
+//!     create_if_missing: true,
+//! };
+//! let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
+//! let api_key = Uuid::new_v4();
 //! let state = AppState::new(database, api_key, "templates".to_string());
 //! let templates = build_templates(state)?;
 //!
@@ -73,16 +84,10 @@ static COMPILED_TEMPLATES: OnceLock<Tera> = OnceLock::new();
 /// - `.jinja`
 /// - `.jinja2`
 ///
-/// # Examples
+/// # Internal Usage
 ///
-/// ```rust,no_run
-/// use url_shortener_ztm_lib::templates::load_templates;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let templates = load_templates("templates".to_string())?;
-/// # Ok(())
-/// # }
-/// ```
+/// This function is used internally by [`build_templates`] and is not
+/// intended for direct use by library consumers.
 fn load_templates(template_dir: String) -> Result<Tera, Error> {
     let templates = Tera::new(&template_dir)?;
     Ok(templates)
@@ -116,6 +121,17 @@ fn load_templates(template_dir: String) -> Result<Tera, Error> {
 /// use tera::Context;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
+/// use url_shortener_ztm_lib::configuration::DatabaseSettings;
+/// use std::sync::Arc;
+/// use uuid::Uuid;
+///
+/// let config = DatabaseSettings {
+///     database_path: "database.db".to_string(),
+///     create_if_missing: true,
+/// };
+/// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
+/// let api_key = Uuid::new_v4();
 /// let state = AppState::new(database, api_key, "templates".to_string());
 /// let templates = build_templates(state)?;
 ///

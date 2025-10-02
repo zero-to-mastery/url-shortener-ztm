@@ -88,12 +88,19 @@ use tracing::Level;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use url_shortener_ztm_lib::startup::shutdown_signal;
+/// use axum::Router;
+/// use tokio::net::TcpListener;
 ///
-/// // Use with axum::serve
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let listener = TcpListener::bind("0.0.0.0:3000").await?;
+/// let router = Router::new();
 /// axum::serve(listener, router)
-///     .with_graceful_shutdown(shutdown_signal())
+///     .with_graceful_shutdown(async {
+///         tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl+c");
+///     })
 ///     .await?;
+/// # Ok(())
+/// # }
 /// ```
 async fn shutdown_signal() {
     let ctrl_c = async {
@@ -237,17 +244,19 @@ impl Application {
     ///
     /// Returns the port number as a `u16`.
     ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use url_shortener_ztm_lib::startup::Application;
-    ///
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let app = Application::build(config).await?;
-    /// println!("Server running on port {}", app.port());
-    /// # Ok(())
-    /// # }
-    /// ```
+/// # Examples
+///
+/// ```rust,no_run
+/// use url_shortener_ztm_lib::startup::Application;
+/// use url_shortener_ztm_lib::configuration::get_configuration;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let config = get_configuration()?;
+/// let app = Application::build(config).await?;
+/// println!("Server running on port {}", app.port());
+/// # Ok(())
+/// # }
+/// ```
     pub fn port(&self) -> u16 {
         self.port
     }
@@ -269,17 +278,19 @@ impl Application {
     /// Returns `Ok(())` if the server shuts down cleanly, or `Err(anyhow::Error)`
     /// if there's an error during server operation.
     ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use url_shortener_ztm_lib::startup::Application;
-    ///
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let app = Application::build(config).await?;
-    /// app.run_until_stopped().await?;
-    /// # Ok(())
-    /// # }
-    /// ```
+/// # Examples
+///
+/// ```rust,no_run
+/// use url_shortener_ztm_lib::startup::Application;
+/// use url_shortener_ztm_lib::configuration::get_configuration;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let config = get_configuration()?;
+/// let app = Application::build(config).await?;
+/// app.run_until_stopped().await?;
+/// # Ok(())
+/// # }
+/// ```
     pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
         axum::serve(self.listener, self.router)
             .with_graceful_shutdown(shutdown_signal())
@@ -324,8 +335,19 @@ impl Application {
 /// ```rust,no_run
 /// use url_shortener_ztm_lib::startup::build_router;
 /// use url_shortener_ztm_lib::state::AppState;
+/// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
+/// use url_shortener_ztm_lib::configuration::DatabaseSettings;
+/// use std::sync::Arc;
+/// use uuid::Uuid;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let config = DatabaseSettings {
+///     database_path: "database.db".to_string(),
+///     create_if_missing: true,
+/// };
+/// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
+/// let api_key = Uuid::new_v4();
+/// let template_dir = "templates".to_string();
 /// let state = AppState::new(database, api_key, template_dir);
 /// let router = build_router(state).await?;
 /// # Ok(())

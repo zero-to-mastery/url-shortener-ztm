@@ -57,10 +57,15 @@ use uuid::Uuid;
 /// ```rust,no_run
 /// use url_shortener_ztm_lib::state::AppState;
 /// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
+/// use url_shortener_ztm_lib::configuration::DatabaseSettings;
 /// use std::sync::Arc;
 /// use uuid::Uuid;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let config = DatabaseSettings {
+///     database_path: "database.db".to_string(),
+///     create_if_missing: true,
+/// };
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();
 /// let template_dir = "templates".to_string();
@@ -100,10 +105,15 @@ impl AppState {
     /// ```rust,no_run
     /// use url_shortener_ztm_lib::state::AppState;
     /// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
+    /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     /// use std::sync::Arc;
     /// use uuid::Uuid;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = DatabaseSettings {
+    ///     database_path: "database.db".to_string(),
+    ///     create_if_missing: true,
+    /// };
     /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
     /// let api_key = Uuid::parse_str("e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5")?;
     /// let template_dir = "templates".to_string();
