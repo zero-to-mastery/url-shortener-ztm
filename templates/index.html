@@ -2,11 +2,69 @@
 
 {% block content %}
 
-<section>
-  <article>
-    <h2>{{ message }}</h2>
-    <p>Built with Axum and Tera</p>
-  </article>
-</section>
+  <div class="container">
+    <header class="hero">
+      <h2>Shorten Your URLs</h2>
+      <p>Create short, shareable links in seconds with our powerful URL shortener</p>
+    </header>
+
+    <main class="url-shortener" role="main">
+      <form id="urlForm" class="url-form" aria-label="URL Shortener Form">
+        <div class="input-group">
+          <label for="urlInput" class="visually-hidden">Enter URL to shorten</label>
+          <input 
+            type="url" 
+            id="urlInput" 
+            name="url"
+            placeholder="Enter your long URL here..." 
+            required 
+            autocomplete="url"
+            aria-describedby="url-help"
+          >
+          <button type="submit" id="submitBtn" class="btn btn-primary" aria-describedby="submit-help">
+            <span class="btn-text">Shorten URL</span>
+            <span class="btn-loading" style="display: none;" aria-hidden="true">
+              <span class="spinner"></span>
+              Shortening...
+            </span>
+          </button>
+        </div>
+        <div id="url-help" class="visually-hidden">Enter a valid URL starting with http:// or https://</div>
+        <div id="submit-help" class="visually-hidden">Click to generate a short URL</div>
+      </form>
+
+      <div id="result" class="result" style="display: none;" role="status" aria-live="polite">
+        <div class="result-content">
+          <div class="result-header">
+            <h3>🎉 Your Short URL is Ready!</h3>
+          </div>
+          <div class="result-body">
+            <div class="short-url-container">
+              <label for="shortUrl" class="visually-hidden">Short URL</label>
+              <input type="text" id="shortUrl" readonly class="short-url-input" aria-label="Generated short URL">
+              <button id="copyBtn" class="btn btn-secondary copy-btn" aria-label="Copy short URL to clipboard">
+                <span class="copy-text">Copy</span>
+                <span class="copy-success" style="display: none;" aria-hidden="true">✓ Copied!</span>
+              </button>
+            </div>
+            <div class="original-url">
+              <strong>Original URL:</strong> <span id="originalUrl"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="error" class="error" style="display: none;" role="alert" aria-live="assertive">
+        <div class="error-content">
+          <h3>⚠️ Error</h3>
+          <p id="errorMessage"></p>
+          <button id="retryBtn" class="btn btn-secondary">Try Again</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+
+</div>
 
 {% endblock content %}
