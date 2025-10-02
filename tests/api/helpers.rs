@@ -78,11 +78,11 @@ pub async fn spawn_app() -> TestApp {
 
     tokio::spawn(async move {
         axum::serve(
-            listener, 
-            test_app.into_make_service_with_connect_info::<std::net::SocketAddr>()
+            listener,
+            test_app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
         )
-            .await
-            .expect("Failed to serve application")
+        .await
+        .expect("Failed to serve application")
     });
 
     // Create an HTTP client for making requests to the application

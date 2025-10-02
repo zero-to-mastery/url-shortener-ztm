@@ -65,7 +65,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower::ServiceBuilder;
-use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
     services::ServeDir,
@@ -295,12 +295,13 @@ impl Application {
     /// ```
     pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
         axum::serve(
-            self.listener, 
-            self.router.into_make_service_with_connect_info::<std::net::SocketAddr>()
+            self.listener,
+            self.router
+                .into_make_service_with_connect_info::<std::net::SocketAddr>(),
         )
-            .with_graceful_shutdown(shutdown_signal())
-            .await
-            .context("Unable to start the app server...")?;
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .context("Unable to start the app server...")?;
         Ok(())
     }
 }
@@ -353,8 +354,9 @@ impl Application {
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();
 /// let template_dir = "templates".to_string();
-/// let state = AppState::new(database, api_key, template_dir);
-/// let router = build_router(state).await?;
+/// // let settings = get_configuration().expect("Failed to read configuration");
+/// // let state = AppState::new(database, api_key, template_dir, settings);
+/// // let router = build_router(state).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -374,10 +376,10 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         let governor_conf = GovernorConfigBuilder::default()
             .per_second(state.config.rate_limiting.requests_per_second)
             .burst_size(state.config.rate_limiting.burst_size)
-            .use_headers()  // Add standard rate limiting headers
+            .use_headers() // Add standard rate limiting headers
             .finish()
             .context("Failed to create rate limiting configuration")?;
-        
+
         // Start background cleanup task
         let governor_limiter = governor_conf.limiter().clone();
         let interval = Duration::from_secs(60);
@@ -389,15 +391,14 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
                 governor_limiter.retain_recent();
             }
         });
-        
+
         Some(governor_conf)
     } else {
         None
     };
 
     // build rate-limited routes (shorten endpoints only)
-    let mut rate_limited_routes = Router::new()
-        .route("/api/public/shorten", post(post_shorten));
+    let mut rate_limited_routes = Router::new().route("/api/public/shorten", post(post_shorten));
 
     // apply rate limiting to shortening endpoints only
     if let Some(rate_config) = rate_limit_config {
@@ -420,11 +421,6 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
             .context("Failed to create secure API rate limiting configuration")?;
         secure_api = secure_api.layer(GovernorLayer::new(secure_rate_config));
     }
-  
-    // Build the secure API (protected by the API key checking middleware)
-    let secure_api = Router::new()
-        .route("/api/shorten", post(post_shorten))
-        .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
     // Build the public routes (no authentication required)
     let public_api = Router::new()

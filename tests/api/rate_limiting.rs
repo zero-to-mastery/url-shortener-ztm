@@ -15,7 +15,7 @@ async fn rate_limiting_blocks_excess_requests() {
 
     // Act - Make requests up to the burst limit (2 requests in test config)
     let mut responses = Vec::new();
-    
+
     for i in 0..2 {
         let response = app
             .client
@@ -25,7 +25,7 @@ async fn rate_limiting_blocks_excess_requests() {
             .send()
             .await
             .expect("Failed to execute request.");
-        
+
         responses.push((i, response.status()));
     }
 
@@ -44,13 +44,19 @@ async fn rate_limiting_blocks_excess_requests() {
         .await
         .expect("Failed to execute request.");
 
-        // Assert - The 3rd request should be rate limited even with valid API key
+    // Assert - The 3rd request should be rate limited even with valid API key
     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
-    
+
     // Check for rate limiting headers
     let headers = response.headers();
-    assert!(headers.contains_key("retry-after"), "Should include retry-after header");
-    assert!(headers.contains_key("x-ratelimit-after"), "Should include x-ratelimit-after header");
+    assert!(
+        headers.contains_key("retry-after"),
+        "Should include retry-after header"
+    );
+    assert!(
+        headers.contains_key("x-ratelimit-after"),
+        "Should include x-ratelimit-after header"
+    );
 }
 
 #[tokio::test]
@@ -69,7 +75,7 @@ async fn rate_limiting_provides_retry_after_headers() {
             .send()
             .await
             .expect("Failed to execute request.");
-        
+
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -82,23 +88,32 @@ async fn rate_limiting_provides_retry_after_headers() {
         .send()
         .await
         .expect("Failed to execute request.");
-    
+
     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
-    
+
     // Verify that rate limiting headers are present and reasonable
     let headers = response.headers();
-    assert!(headers.contains_key("retry-after"), "Should include retry-after header");
-    assert!(headers.contains_key("x-ratelimit-after"), "Should include x-ratelimit-after header");
-    
+    assert!(
+        headers.contains_key("retry-after"),
+        "Should include retry-after header"
+    );
+    assert!(
+        headers.contains_key("x-ratelimit-after"),
+        "Should include x-ratelimit-after header"
+    );
+
     let retry_after = headers
         .get("retry-after")
         .and_then(|h| h.to_str().ok())
         .and_then(|s| s.parse::<f64>().ok())
         .expect("retry-after should be a valid number");
-    
+
     // The retry after should be reasonable (less than 2 minutes for this test config)
     assert!(retry_after > 0.0, "retry-after should be positive");
-    assert!(retry_after < 120.0, "retry-after should be less than 2 minutes for test config");
+    assert!(
+        retry_after < 120.0,
+        "retry-after should be less than 2 minutes for test config"
+    );
 }
 
 #[tokio::test]
@@ -124,7 +139,7 @@ async fn rate_limiting_works_per_ip_address() {
             .send()
             .await
             .expect("Failed to execute request.");
-        
+
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -155,7 +170,7 @@ async fn health_check_is_not_rate_limited() {
             .send()
             .await
             .expect("Failed to execute request.");
-        
+
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -168,7 +183,7 @@ async fn health_check_is_not_rate_limited() {
         .send()
         .await
         .expect("Failed to execute request.");
-    
+
     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
 
     // Health check should still work
@@ -200,7 +215,7 @@ async fn secure_api_is_rate_limited() {
             .send()
             .await
             .expect("Failed to execute request.");
-        
+
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -223,13 +238,28 @@ async fn secure_api_is_rate_limited() {
 async fn rate_limiting_configuration_is_loaded() {
     // Test that the configuration structure is loaded correctly
     let config = get_configuration().expect("Failed to read configuration");
-    
+
     // The configuration should have rate limiting settings
-    assert!(config.rate_limiting.enabled, "Rate limiting should be enabled");
-    assert!(config.rate_limiting.requests_per_second > 0, "Rate should be positive");
-    assert!(config.rate_limiting.burst_size > 0, "Burst size should be positive");
-    
+    assert!(
+        config.rate_limiting.enabled,
+        "Rate limiting should be enabled"
+    );
+    assert!(
+        config.rate_limiting.requests_per_second > 0,
+        "Rate should be positive"
+    );
+    assert!(
+        config.rate_limiting.burst_size > 0,
+        "Burst size should be positive"
+    );
+
     // Test that the values are reasonable (either from base.yml or local.yml depending on environment)
-    assert!(config.rate_limiting.requests_per_second >= 10, "Rate should be at least 10 req/sec");
-    assert!(config.rate_limiting.burst_size >= 5, "Burst size should be at least 5");
+    assert!(
+        config.rate_limiting.requests_per_second >= 10,
+        "Rate should be at least 10 req/sec"
+    );
+    assert!(
+        config.rate_limiting.burst_size >= 5,
+        "Burst size should be at least 5"
+    );
 }

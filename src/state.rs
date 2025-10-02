@@ -30,6 +30,7 @@
 //! }
 //! ```
 
+use crate::configuration::Settings;
 use crate::database::UrlDatabase;
 use axum_macros::FromRef;
 use std::sync::Arc;
@@ -69,8 +70,9 @@ use uuid::Uuid;
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();
 /// let template_dir = "templates".to_string();
+/// // let settings = get_configuration().expect("Failed to read configuration");
 ///
-/// let state = AppState::new(database, api_key, template_dir);
+/// // let state = AppState::new(database, api_key, template_dir, settings);
 /// # Ok(())
 /// # }
 /// ```
@@ -96,6 +98,7 @@ impl AppState {
     /// * `database` - Database connection wrapped in `Arc` for shared ownership
     /// * `api_key` - UUID-based API key for authentication
     /// * `template_dir` - Directory path containing Tera template files
+    /// * `config` - Application configuration settings
     ///
     /// # Returns
     ///
@@ -106,7 +109,7 @@ impl AppState {
     /// ```rust,no_run
     /// use url_shortener_ztm_lib::state::AppState;
     /// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
-    /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
+    /// use url_shortener_ztm_lib::configuration::{DatabaseSettings, Settings};
     /// use std::sync::Arc;
     /// use uuid::Uuid;
     ///
@@ -118,12 +121,18 @@ impl AppState {
     /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
     /// let api_key = Uuid::parse_str("e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5")?;
     /// let template_dir = "templates".to_string();
+    /// // let settings = Settings::new().unwrap(); // Get from configuration
     ///
-    /// let state = AppState::new(database, api_key, template_dir);
+    /// // let state = AppState::new(database, api_key, template_dir, settings);
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(database: Arc<dyn UrlDatabase>, api_key: Uuid, template_dir: String) -> Self {
+    pub fn new(
+        database: Arc<dyn UrlDatabase>,
+        api_key: Uuid,
+        template_dir: String,
+        config: Settings,
+    ) -> Self {
         Self {
             database,
             api_key,

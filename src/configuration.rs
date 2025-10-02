@@ -75,7 +75,11 @@ impl fmt::Display for Settings {
         )?;
         writeln!(f, "Rate Limiting Settings:")?;
         writeln!(f, "  Enabled: {}", self.rate_limiting.enabled)?;
-        writeln!(f, "  Requests per second: {}", self.rate_limiting.requests_per_second)?;
+        writeln!(
+            f,
+            "  Requests per second: {}",
+            self.rate_limiting.requests_per_second
+        )?;
         writeln!(f, "  Burst size: {}", self.rate_limiting.burst_size)?;
         Ok(())
     }
