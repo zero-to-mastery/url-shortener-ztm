@@ -1,8 +1,8 @@
-// src/lib/routes/redirect.rs
+//! # URL Redirect Handler
+//!
+//! This module provides the URL redirect handler for the URL shortener service.
+//! It handles requests to shortened URLs and redirects users to the original URLs.
 
-// endpoint handler which provides the shortened URL to redirect to
-
-// dependencies
 use crate::database::DatabaseError;
 use crate::errors::ApiError;
 use crate::state::AppState;
@@ -12,7 +12,68 @@ use axum::{
 };
 use axum_macros::debug_handler;
 
-// redirect endpoint handler
+/// URL redirect handler that redirects users to the original URL.
+///
+/// This handler processes requests to shortened URLs and redirects users to
+/// the original URLs stored in the database. It uses HTTP 308 Permanent Redirect
+/// to ensure proper SEO handling and browser caching.
+///
+/// # Endpoint
+///
+/// `GET /api/redirect/{id}`
+///
+/// # Arguments
+///
+/// * `State(state)` - Application state containing database connection
+/// * `Path(id)` - Short URL identifier extracted from the URL path
+///
+/// # Returns
+///
+/// Returns `Ok(Redirect)` with a permanent redirect to the original URL, or
+/// `Err(ApiError)` if the URL is not found or there's a database error.
+///
+/// # Redirect Behavior
+///
+/// - **HTTP 308 Permanent Redirect** - Indicates that the resource has permanently
+///   moved to the new location
+/// - **SEO Friendly** - Search engines understand that the short URL is an alias
+///   for the original URL
+/// - **Browser Caching** - Browsers may cache the redirect for performance
+///
+/// # Status Codes
+///
+/// - `308 Permanent Redirect` - URL found and redirect successful
+/// - `404 Not Found` - Short URL not found in database
+/// - `500 Internal Server Error` - Database error occurred
+///
+/// # Tracing
+///
+/// This handler is instrumented with tracing for request monitoring:
+/// - Successful redirects are logged at info level
+/// - Not found errors are logged at error level
+/// - Database errors are logged at error level
+///
+/// # Examples
+///
+/// ```bash
+/// # Redirect to original URL
+/// curl -L http://localhost:8000/api/redirect/AbC123
+///
+/// # Expected behavior: HTTP 308 redirect to original URL
+/// ```
+///
+/// # Error Handling
+///
+/// This handler handles the following error cases:
+/// - **URL Not Found** - Returns 404 with appropriate error message
+/// - **Database Errors** - Returns 500 with internal error message
+/// - **Invalid ID Format** - Handled by Axum's path extraction
+///
+/// # Performance Considerations
+///
+/// - Database queries are optimized for fast lookups
+/// - Redirects are processed asynchronously
+/// - Error responses are minimal to reduce bandwidth
 #[debug_handler]
 #[tracing::instrument(name = "redirect" skip(state))]
 pub async fn get_redirect(
