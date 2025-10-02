@@ -153,6 +153,48 @@ impl TestApp {
             .await
             .expect("Failed to execute POST request")
     }
+
+    // Admin route helpers
+    pub async fn get_admin_dashboard(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin"))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    pub async fn get_admin_dashboard_with_api_key(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin"))
+            .header("x-api-key", self.api_key.to_string())
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    pub async fn get_admin_login(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin/login"))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    pub async fn get_admin_register(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin/register"))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    pub async fn get_admin_profile(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin/profile"))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
 }
 
 // Assertion helpers
