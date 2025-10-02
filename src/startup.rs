@@ -1,8 +1,52 @@
-// src/lib/startup.rs
+//! # Application Startup and Configuration
+//!
+//! This module handles the complete application startup process, including database
+//! initialization, router configuration, and server startup with graceful shutdown.
+//!
+//! ## Startup Process
+//!
+//! The application startup follows these steps:
+//! 1. Database connection and migration
+//! 2. Application state initialization
+//! 3. Router configuration with middleware
+//! 4. Server binding and startup
+//! 5. Graceful shutdown handling
+//!
+//! ## Router Configuration
+//!
+//! The application router is organized into several route groups:
+//! - **Public API** - Health check and redirect endpoints (no authentication)
+//! - **Protected API** - URL shortening endpoint (requires API key)
+//! - **Admin Panel** - Web interface for management
+//! - **Static Files** - CSS, JavaScript, and other assets
+//!
+//! ## Middleware Stack
+//!
+//! The application uses several middleware layers:
+//! - **Request ID** - Unique identifier for each request
+//! - **Tracing** - Request/response logging and tracing
+//! - **API Key Authentication** - For protected endpoints
+//!
+//! ## Graceful Shutdown
+//!
+//! The application supports graceful shutdown on:
+//! - `SIGINT` (Ctrl+C)
+//! - `SIGTERM` (termination signal)
+//!
+//! ## Usage
+//!
+//! ```rust,no_run
+//! use url_shortener_ztm_lib::startup::Application;
+//! use url_shortener_ztm_lib::configuration::get_configuration;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let config = get_configuration()?;
+//! let app = Application::build(config).await?;
+//! app.run_until_stopped().await?;
+//! # Ok(())
+//! # }
+//! ```
 
-// contains all the startup and configuration logic for the application
-
-// dependencies
 use crate::configuration::Settings;
 use crate::database::SqliteUrlDatabase;
 use crate::middleware::check_api_key;
@@ -27,7 +71,37 @@ use tower_http::{
 };
 use tracing::Level;
 
-// utility function to gracefully shut down the app
+/// Handles graceful shutdown signals for the application.
+///
+/// This function listens for system signals that should trigger a graceful shutdown:
+/// - `SIGINT` (Ctrl+C) - User-initiated shutdown
+/// - `SIGTERM` (Unix only) - System-initiated shutdown
+///
+/// The function uses `tokio::select!` to wait for either signal and then returns,
+/// allowing the server to complete any in-flight requests before shutting down.
+///
+/// # Platform Support
+///
+/// - **Unix systems**: Supports both `SIGINT` and `SIGTERM`
+/// - **Windows**: Supports only `SIGINT` (Ctrl+C)
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use axum::Router;
+/// use tokio::net::TcpListener;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let listener = TcpListener::bind("0.0.0.0:3000").await?;
+/// let router = Router::new();
+/// axum::serve(listener, router)
+///     .with_graceful_shutdown(async {
+///         tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl+c");
+///     })
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
 async fn shutdown_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
@@ -52,24 +126,93 @@ async fn shutdown_signal() {
     }
 }
 
-// struct type to represent the application, includes port, listener, router and state fields
+/// Main application struct containing all server components.
+///
+/// This struct holds all the necessary components to run the URL shortener service,
+/// including the TCP listener, router, application state, and port information.
+///
+/// # Fields
+///
+/// * `port` - The port number the server is listening on
+/// * `listener` - TCP listener for incoming connections
+/// * `router` - Axum router with all configured routes and middleware
+/// * `state` - Application state shared across all handlers
+///
+/// # Thread Safety
+///
+/// This struct is designed to be safely moved between threads and async tasks.
+/// All contained types implement the necessary traits for thread safety.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use url_shortener_ztm_lib::startup::Application;
+/// use url_shortener_ztm_lib::configuration::get_configuration;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let config = get_configuration()?;
+/// let app = Application::build(config).await?;
+/// println!("Server running on port {}", app.port());
+/// app.run_until_stopped().await?;
+/// # Ok(())
+/// # }
+/// ```
 #[allow(dead_code)]
 pub struct Application {
+    /// Port number the server is listening on
     port: u16,
+    /// TCP listener for incoming connections
     listener: TcpListener,
+    /// Axum router with all configured routes and middleware
     router: Router,
+    /// Application state shared across all handlers
     state: AppState,
 }
 
-// methods for the Application type
 impl Application {
-    // builds the router for the application
+    /// Builds and initializes the application with the given configuration.
+    ///
+    /// This method performs the complete application initialization process:
+    /// 1. Sets up the database connection and runs migrations
+    /// 2. Creates the TCP listener on the configured address
+    /// 3. Initializes the application state
+    /// 4. Builds the router with all routes and middleware
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Application configuration settings
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Application)` if initialization succeeds, or `Err(anyhow::Error)`
+    /// if any step fails.
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error if:
+    /// - Database connection fails
+    /// - Database migrations fail
+    /// - TCP listener cannot be bound to the configured address
+    /// - Router creation fails
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use url_shortener_ztm_lib::startup::Application;
+    /// use url_shortener_ztm_lib::configuration::get_configuration;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = get_configuration()?;
+    /// let app = Application::build(config).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn build(config: Settings) -> Result<Self, anyhow::Error> {
-        // set up the database connection pool and run migrations
+        // Set up the database connection pool and run migrations
         let database = Arc::new(SqliteUrlDatabase::from_config(&config.database).await?);
         database.migrate().await?;
 
-        // set up the TCP listener and application state
+        // Set up the TCP listener and application state
         let api_key = config.application.api_key;
         let template_dir = config.application.templates;
         let address = format!("{}:{}", config.application.host, config.application.port);
@@ -79,7 +222,7 @@ impl Application {
         let port = listener.local_addr()?.port();
         let state = AppState::new(database, api_key, template_dir);
 
-        // build the application router, passing in the application state
+        // Build the application router, passing in the application state
         let router = build_router(state.clone())
             .await
             .context("Failed to create the application router.")?;
@@ -92,12 +235,62 @@ impl Application {
         })
     }
 
-    // utility function to return the application port, if needed
+    /// Returns the port number the server is listening on.
+    ///
+    /// This method provides access to the port number that was assigned to the
+    /// TCP listener. This is useful for logging and monitoring purposes.
+    ///
+    /// # Returns
+    ///
+    /// Returns the port number as a `u16`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use url_shortener_ztm_lib::startup::Application;
+    /// use url_shortener_ztm_lib::configuration::get_configuration;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = get_configuration()?;
+    /// let app = Application::build(config).await?;
+    /// println!("Server running on port {}", app.port());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn port(&self) -> u16 {
         self.port
     }
 
-    // function to run the app until stopped
+    /// Runs the application server until stopped.
+    ///
+    /// This method starts the HTTP server and runs it until a shutdown signal
+    /// is received. The server will handle graceful shutdown, allowing in-flight
+    /// requests to complete before terminating.
+    ///
+    /// # Graceful Shutdown
+    ///
+    /// The server will shut down gracefully when it receives:
+    /// - `SIGINT` (Ctrl+C)
+    /// - `SIGTERM` (Unix only)
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the server shuts down cleanly, or `Err(anyhow::Error)`
+    /// if there's an error during server operation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use url_shortener_ztm_lib::startup::Application;
+    /// use url_shortener_ztm_lib::configuration::get_configuration;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = get_configuration()?;
+    /// let app = Application::build(config).await?;
+    /// app.run_until_stopped().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
         axum::serve(self.listener, self.router)
             .with_graceful_shutdown(shutdown_signal())
@@ -107,9 +300,61 @@ impl Application {
     }
 }
 
-// function which configures and creates the application router
+/// Builds and configures the application router with all routes and middleware.
+///
+/// This function creates the complete Axum router with all configured routes,
+/// middleware layers, and static file serving. The router is organized into
+/// several logical groups for better maintainability.
+///
+/// # Route Groups
+///
+/// The router is organized into the following groups:
+/// - **Public API** - Health check and redirect endpoints (no authentication required)
+/// - **Protected API** - URL shortening endpoint (requires API key authentication)
+/// - **Admin Panel** - Web interface for management
+/// - **Static Files** - CSS, JavaScript, and other assets
+///
+/// # Middleware Stack
+///
+/// The following middleware layers are applied in order:
+/// 1. **Request ID** - Generates unique identifiers for each request
+/// 2. **Tracing** - Logs request/response information
+/// 3. **API Key Authentication** - For protected endpoints only
+///
+/// # Arguments
+///
+/// * `state` - Application state to be shared with all handlers
+///
+/// # Returns
+///
+/// Returns `Ok(Router)` if the router is successfully created, or
+/// `Err(anyhow::Error)` if there's an error during configuration.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use url_shortener_ztm_lib::startup::build_router;
+/// use url_shortener_ztm_lib::state::AppState;
+/// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
+/// use url_shortener_ztm_lib::configuration::DatabaseSettings;
+/// use std::sync::Arc;
+/// use uuid::Uuid;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let config = DatabaseSettings {
+///     database_path: "database.db".to_string(),
+///     create_if_missing: true,
+/// };
+/// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
+/// let api_key = Uuid::new_v4();
+/// let template_dir = "templates".to_string();
+/// let state = AppState::new(database, api_key, template_dir);
+/// let router = build_router(state).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
-    // define the tracing layer
+    // Define the tracing layer for request/response logging
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(
             DefaultMakeSpan::new()
@@ -119,21 +364,21 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .on_response(DefaultOnResponse::new().include_headers(true));
     let x_request_id = HeaderName::from_static("x-request-id");
 
-    // build the secure API (protected by the API key checking middleware)
+    // Build the secure API (protected by the API key checking middleware)
     let secure_api = Router::new()
         .route("/api/shorten", post(post_shorten))
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
-    // build the public routes
+    // Build the public routes (no authentication required)
     let public_api = Router::new()
         .route("/api/health_check", get(health_check))
         .route("/api/redirect/{id}", get(get_redirect))
         .route("/api/public/shorten", post(post_shorten));
 
-    // build the admin panel routes
+    // Build the admin panel routes
     let admin_panel = Router::new().route("/admin", get(get_index));
 
-    // build the router by merging the secure and public routes, along with the admin panel routes, with tracing
+    // Build the complete router by merging all route groups
     let router = Router::new()
         .merge(public_api)
         .merge(secure_api)
