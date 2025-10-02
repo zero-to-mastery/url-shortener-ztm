@@ -1,6 +1,6 @@
 [package]
 name = "url-shortener-ztm"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 
 [[bin]]
@@ -13,8 +13,8 @@ name = "url_shortener_ztm_lib"
 [dependencies]
 anyhow = "1.0.100"
 async-trait = "0.1.89"
-axum = "0.8.4"
-axum-extra = { version = "0.10.1", features = [ "typed-header" ] }
+axum = "0.8.6"
+axum-extra = { version = "0.10.3", features = [ "typed-header" ] }
 axum-macros = "0.5.0"
 chrono = { version = "0.4.42", features = ["serde"] }
 figment = { version = "0.10.19", features = [ "env", "yaml" ] }
@@ -23,7 +23,7 @@ serde = { version = "1.0.226", features = ["derive"] }
 serde-aux = "4.7.0"
 sqlx = { version = "0.8.6", features = [ "runtime-tokio", "tls-rustls", "sqlite" ] }
 tera = "1.20.0"
-thiserror = "2.0.12"
+thiserror = "2.0.17"
 tokio = { version = "1.45.1", features = [ "macros", "net", "rt-multi-thread", "signal" ] }
 tower = "0.5.2"
 tower-http = { version = "0.6.6", features = [ "fs", "request-id", "trace" ] }
