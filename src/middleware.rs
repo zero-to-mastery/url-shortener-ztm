@@ -21,7 +21,6 @@
 //     .route("/api/shorten", post(shorten_handler))
 //     .route_layer(from_fn_with_state(state, check_api_key));
 /// ```
-
 use crate::response::ApiResponse;
 use crate::state::AppState;
 use axum::{
