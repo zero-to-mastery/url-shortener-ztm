@@ -1,6 +1,7 @@
 // src/lib/state.rs
 
 // dependencies
+use crate::configuration::Settings;
 use crate::database::UrlDatabase;
 use axum_macros::FromRef;
 use std::sync::Arc;
@@ -12,16 +13,18 @@ pub struct AppState {
     pub database: Arc<dyn UrlDatabase>,
     pub api_key: Uuid,
     pub template_dir: String,
+    pub config: Settings,
 }
 
 // methods to build the application state
 impl AppState {
     // Create a new application state instance
-    pub fn new(database: Arc<dyn UrlDatabase>, api_key: Uuid, template_dir: String) -> Self {
+    pub fn new(database: Arc<dyn UrlDatabase>, api_key: Uuid, template_dir: String, config: Settings) -> Self {
         Self {
             database,
             api_key,
             template_dir,
+            config,
         }
     }
 }

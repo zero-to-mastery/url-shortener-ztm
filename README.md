@@ -6,6 +6,7 @@ A high-performance URL shortener service built with modern Rust technologies. Th
 
 - **Fast URL shortening**: Generate short, unique identifiers for long URLs using nanoid
 - **Reliable redirects**: Permanent redirects to original URLs with proper HTTP status codes
+- **Rate limiting**: Built-in rate limiting to prevent abuse using tower-governor
 - **SQLite storage**: Lightweight, file-based database with automatic migrations
 - **Database abstraction**: Trait-based database layer for easy database switching
 - **Comprehensive logging**: Structured logging with tracing and request IDs
@@ -18,6 +19,7 @@ A high-performance URL shortener service built with modern Rust technologies. Th
 
 - **Framework**: [Axum](https://github.com/tokio-rs/axum) - Modern async web framework
 - **Database**: SQLite with [SQLx](https://github.com/launchbadge/sqlx) for type-safe queries
+- **Rate Limiting**: [tower-governor](https://crates.io/crates/tower_governor) - Per-IP rate limiting with GCRA algorithm
 - **Templates**: [Tera](https://keats.github.io/tera/) - Template engine for web interface
 - **Configuration**: [Figment](https://github.com/SergioBenitez/figment) - Layered configuration
 - **Logging**: Structured logging with `tracing` and Bunyan formatting
@@ -166,6 +168,50 @@ database:
   create_if_missing: true
 ```
 
+#### Rate Limiting Configuration
+The service includes built-in rate limiting to prevent abuse using the [tower-governor](https://crates.io/crates/tower_governor) crate:
+
+```yaml
+rate_limiting:
+  enabled: true              # Enable/disable rate limiting
+  requests_per_second: 10    # Maximum sustained request rate per IP
+  burst_size: 5              # Additional burst capacity per IP
+```
+
+**Environment-specific examples:**
+
+**Development** (`configuration/local.yaml`):
+```yaml
+rate_limiting:
+  enabled: true
+  requests_per_second: 20    # More lenient for development
+  burst_size: 10
+```
+
+**Production** (`configuration/production.yaml`):
+```yaml
+rate_limiting:
+  enabled: true
+  requests_per_second: 5     # Strict rate limiting for production
+  burst_size: 3
+```
+
+**Rate Limiting Behavior:**
+- Limits are applied **per IP address** using the GCRA (Generic Cell Rate Algorithm)
+- Only **URL shortening endpoints** are rate limited (`/api/shorten`, `/api/public/shorten`)
+- Health checks and redirects are **not rate limited**
+- Standard HTTP headers are included in rate limit responses:
+  - `retry-after`: Seconds to wait before retrying
+  - `x-ratelimit-after`: Additional rate limiting information
+- Returns **HTTP 429 Too Many Requests** when limits are exceeded
+
+**Environment Variable Override:**
+```bash
+APP_RATE_LIMITING__ENABLED=false                 # Disable rate limiting
+APP_RATE_LIMITING__REQUESTS_PER_SECOND=100       # 100 requests per second
+APP_RATE_LIMITING__BURST_SIZE=20                 # Allow bursts of 20 requests
+```
+
 ## 🧪 Testing
 
 The project includes comprehensive integration tests using in-memory SQLite databases.
@@ -187,6 +233,7 @@ cargo test shorten
 - ✅ Health check endpoint with JSON envelope validation
 - ✅ URL shortening functionality with API key authentication
 - ✅ URL redirection with proper HTTP status codes
+- ✅ Rate limiting with per-IP enforcement and proper HTTP headers
 - ✅ Database integration with trait abstraction
 - ✅ Error handling and edge cases
 

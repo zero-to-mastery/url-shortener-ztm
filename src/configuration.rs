@@ -15,6 +15,7 @@ use uuid::Uuid;
 pub struct Settings {
     pub application: ApplicationSettings,
     pub database: DatabaseSettings,
+    pub rate_limiting: RateLimitingSettings,
 }
 
 // implement the Display trait for the Settings struct
@@ -32,6 +33,10 @@ impl fmt::Display for Settings {
             "  Create if Missing: {}",
             self.database.create_if_missing
         )?;
+        writeln!(f, "Rate Limiting Settings:")?;
+        writeln!(f, "  Enabled: {}", self.rate_limiting.enabled)?;
+        writeln!(f, "  Requests per second: {}", self.rate_limiting.requests_per_second)?;
+        writeln!(f, "  Burst size: {}", self.rate_limiting.burst_size)?;
         Ok(())
     }
 }
@@ -50,6 +55,16 @@ pub struct ApplicationSettings {
 pub struct DatabaseSettings {
     pub database_path: String,
     pub create_if_missing: bool,
+}
+
+// struct type to represent rate limiting settings
+#[derive(Clone, Debug, Deserialize)]
+pub struct RateLimitingSettings {
+    pub enabled: bool,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub requests_per_second: u64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub burst_size: u32,
 }
 
 impl DatabaseSettings {
