@@ -3,8 +3,9 @@
 // contains all the startup and configuration logic for the application
 
 // dependencies
-use crate::configuration::Settings;
-use crate::database::SqliteUrlDatabase;
+use crate::configuration::{DatabaseType, Settings};
+use crate::database::postgres_sql::PostgresUrlDatabase;
+use crate::database::{SqliteUrlDatabase, UrlDatabase};
 use crate::middleware::check_api_key;
 use crate::routes::{get_index, get_redirect, health_check, post_shorten};
 use crate::state::AppState;
@@ -66,8 +67,18 @@ impl Application {
     // builds the router for the application
     pub async fn build(config: Settings) -> Result<Self, anyhow::Error> {
         // set up the database connection pool and run migrations
-        let database = Arc::new(SqliteUrlDatabase::from_config(&config.database).await?);
-        database.migrate().await?;
+        let database: Arc<dyn UrlDatabase> = match config.database.r#type {
+            DatabaseType::Sqlite => {
+                let db = SqliteUrlDatabase::from_config(&config.database).await?;
+                db.migrate().await?;
+                Arc::new(db) as Arc<dyn UrlDatabase>
+            }
+            DatabaseType::Postgres => {
+                let db = PostgresUrlDatabase::from_config(&config.database).await?;
+                db.migrate().await?;
+                Arc::new(db) as Arc<dyn UrlDatabase>
+            }
+        };
 
         // set up the TCP listener and application state
         let api_key = config.application.api_key;

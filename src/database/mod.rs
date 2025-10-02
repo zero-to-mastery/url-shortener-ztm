@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use std::fmt;
 
 // module declarations
+pub mod postgres_sql;
 pub mod sqlite;
 
 // re-exports

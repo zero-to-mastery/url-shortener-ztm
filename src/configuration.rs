@@ -1,9 +1,10 @@
 // src/lib/configuration.rs
 
 // dependencies
+use figment::providers::Env;
 use figment::{
     Figment,
-    providers::{Env, Format, Yaml},
+    providers::{Format, Yaml},
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
@@ -26,7 +27,8 @@ impl fmt::Display for Settings {
         writeln!(f, "  API Key: {}", self.application.api_key)?;
         writeln!(f, "  Templates: {}", self.application.templates)?;
         writeln!(f, "Database Settings:")?;
-        writeln!(f, "  Database Path: {}", self.database.database_path)?;
+        writeln!(f, "  Database Type: {:?}", self.database.r#type)?;
+        writeln!(f, "  Database URL: {}", self.database.url)?;
         writeln!(
             f,
             "  Create if Missing: {}",
@@ -46,18 +48,33 @@ pub struct ApplicationSettings {
     pub templates: String,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DatabaseType {
+    Sqlite,
+    Postgres,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct DatabaseSettings {
-    pub database_path: String,
+    pub r#type: DatabaseType,
+    #[serde(alias = "database_path")]
+    pub url: String,
+    #[serde(default)]
     pub create_if_missing: bool,
 }
 
 impl DatabaseSettings {
     pub fn connection_string(&self) -> String {
-        if self.database_path == ":memory:" {
-            "sqlite::memory:".to_string()
-        } else {
-            format!("sqlite:{}", self.database_path)
+        match self.r#type {
+            DatabaseType::Sqlite => {
+                if self.url == ":memory:" {
+                    "sqlite::memory:".to_string()
+                } else {
+                    self.url.clone()
+                }
+            }
+            _ => self.url.clone(),
         }
     }
 }
