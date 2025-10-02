@@ -31,7 +31,7 @@
 //!   host: "127.0.0.1"
 //!   api_key: "e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5"
 //!   templates: "templates"
-//! 
+//!
 //! database:
 //!   database_path: "database.db"
 //!   create_if_missing: true

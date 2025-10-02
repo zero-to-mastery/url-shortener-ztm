@@ -244,19 +244,19 @@ impl Application {
     ///
     /// Returns the port number as a `u16`.
     ///
-/// # Examples
-///
-/// ```rust,no_run
-/// use url_shortener_ztm_lib::startup::Application;
-/// use url_shortener_ztm_lib::configuration::get_configuration;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let config = get_configuration()?;
-/// let app = Application::build(config).await?;
-/// println!("Server running on port {}", app.port());
-/// # Ok(())
-/// # }
-/// ```
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use url_shortener_ztm_lib::startup::Application;
+    /// use url_shortener_ztm_lib::configuration::get_configuration;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = get_configuration()?;
+    /// let app = Application::build(config).await?;
+    /// println!("Server running on port {}", app.port());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn port(&self) -> u16 {
         self.port
     }
@@ -278,19 +278,19 @@ impl Application {
     /// Returns `Ok(())` if the server shuts down cleanly, or `Err(anyhow::Error)`
     /// if there's an error during server operation.
     ///
-/// # Examples
-///
-/// ```rust,no_run
-/// use url_shortener_ztm_lib::startup::Application;
-/// use url_shortener_ztm_lib::configuration::get_configuration;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let config = get_configuration()?;
-/// let app = Application::build(config).await?;
-/// app.run_until_stopped().await?;
-/// # Ok(())
-/// # }
-/// ```
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use url_shortener_ztm_lib::startup::Application;
+    /// use url_shortener_ztm_lib::configuration::get_configuration;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = get_configuration()?;
+    /// let app = Application::build(config).await?;
+    /// app.run_until_stopped().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
         axum::serve(self.listener, self.router)
             .with_graceful_shutdown(shutdown_signal())

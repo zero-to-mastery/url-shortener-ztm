@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
     // Build the application with database connection and router setup
     tracing::info!("Starting up the application...");
     let application = Application::build(configuration.clone()).await?;
-    
+
     // Run the server until stopped (handles graceful shutdown)
     application.run_until_stopped().await?;
 
