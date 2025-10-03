@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="hero">
+    <h2>Admin Dashboard</h2>
+    <p>{{ message }}</p>
+  </div>
+  
+  <div class="admin-panel">
+    <div class="admin-nav">
+      <h3>Admin Navigation</h3>
+      <ul>
+        <li><a href="/admin/profile">User Profile</a></li>
+        <li><a href="/admin/users">Manage Users</a></li>
+        <li><a href="/admin/urls">Manage URLs</a></li>
+        <li><a href="/admin/analytics">Analytics</a></li>
+      </ul>
+    </div>
+    
+    <div class="admin-content">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h4>Total URLs</h4>
+          <p class="stat-number">0</p>
+        </div>
+        <div class="stat-card">
+          <h4>Total Users</h4>
+          <p class="stat-number">0</p>
+        </div>
+        <div class="stat-card">
+          <h4>Total Clicks</h4>
+          <p class="stat-number">0</p>
+        </div>
+        <div class="stat-card">
+          <h4>Active Today</h4>
+          <p class="stat-number">0</p>
+        </div>
+      </div>
+      
+      <div class="recent-activity">
+        <h3>Recent Activity</h3>
+        <div class="activity-list">
+          <p>No recent activity to display.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="admin-actions">
+    <a href="/" class="btn secondary">Back to Home</a>
+    <a href="/admin/logout" class="btn primary">Logout</a>
+  </div>
+</div>
+{% endblock content %}

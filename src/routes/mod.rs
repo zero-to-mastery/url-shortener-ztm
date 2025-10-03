@@ -43,12 +43,16 @@
 //!     .route("/api/shorten", post(post_shorten));
 //! ```
 
+// module declarations
+pub mod admin;
 // Module declarations
 pub mod health_check;
 pub mod index;
 pub mod redirect;
 pub mod shorten;
 
+// re-exports
+pub use admin::*;
 // Re-exports for convenience
 pub use health_check::*;
 pub use index::*;
