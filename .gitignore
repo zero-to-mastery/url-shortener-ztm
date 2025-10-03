@@ -1,10 +1,12 @@
 # .gitignore configuration
 
-# VS code settings
+# VScode, Idea settings
 .vscode
+.idea
 
 # environment variables
 .env
+.direnv
 
 # system files
 .DS_Store
@@ -17,3 +19,4 @@
 # Ignore local DBs and weird files
 *.db
 NUL
+.pre-commit-config.yaml
