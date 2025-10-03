@@ -19,7 +19,7 @@ async fn rate_limiting_blocks_excess_requests() {
     for i in 0..2 {
         let response = app
             .client
-            .post(&app.url("/api/public/shorten"))
+            .post(app.url("/api/public/shorten"))
             .header("content-type", "text/plain")
             .body(format!("{}-{}", test_url, i))
             .send()
@@ -37,7 +37,7 @@ async fn rate_limiting_blocks_excess_requests() {
     // Make the 3rd request (should be rate limited)
     let response = app
         .client
-        .post(&app.url("/api/public/shorten"))
+        .post(app.url("/api/public/shorten"))
         .header("content-type", "text/plain")
         .body(format!("{}-rate-limited", test_url))
         .send()
@@ -69,7 +69,7 @@ async fn rate_limiting_provides_retry_after_headers() {
     for i in 0..2 {
         let response = app
             .client
-            .post(&app.url("/api/public/shorten"))
+            .post(app.url("/api/public/shorten"))
             .header("content-type", "text/plain")
             .body(format!("{}-{}", test_url, i))
             .send()
@@ -82,7 +82,7 @@ async fn rate_limiting_provides_retry_after_headers() {
     // The 3rd request should be rate limited
     let response = app
         .client
-        .post(&app.url("/api/public/shorten"))
+        .post(app.url("/api/public/shorten"))
         .header("content-type", "text/plain")
         .body(format!("{}-rate-limited", test_url))
         .send()
@@ -133,7 +133,7 @@ async fn rate_limiting_works_per_ip_address() {
     // Use up the rate limit with client1
     for i in 0..2 {
         let response = client1
-            .post(&app.url("/api/public/shorten"))
+            .post(app.url("/api/public/shorten"))
             .header("content-type", "text/plain")
             .body(format!("{}-{}", test_url, i))
             .send()
@@ -145,7 +145,7 @@ async fn rate_limiting_works_per_ip_address() {
 
     // client2 should also be rate limited (same IP)
     let response = client2
-        .post(&app.url("/api/public/shorten"))
+        .post(app.url("/api/public/shorten"))
         .header("content-type", "text/plain")
         .body(test_url)
         .send()
@@ -164,7 +164,7 @@ async fn health_check_is_not_rate_limited() {
     for i in 0..2 {
         let response = app
             .client
-            .post(&app.url("/api/public/shorten"))
+            .post(app.url("/api/public/shorten"))
             .header("content-type", "text/plain")
             .body(format!("https://www.example.com/{}", i))
             .send()
@@ -177,7 +177,7 @@ async fn health_check_is_not_rate_limited() {
     // Verify the next URL shortening request is rate limited
     let response = app
         .client
-        .post(&app.url("/api/public/shorten"))
+        .post(app.url("/api/public/shorten"))
         .header("content-type", "text/plain")
         .body("https://www.example.com")
         .send()
@@ -189,7 +189,7 @@ async fn health_check_is_not_rate_limited() {
     // Health check should still work
     let response = app
         .client
-        .get(&app.url("/api/health_check"))
+        .get(app.url("/api/health_check"))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -208,7 +208,7 @@ async fn secure_api_is_rate_limited() {
     for i in 0..2 {
         let response = app
             .client
-            .post(&app.url("/api/shorten"))
+            .post(app.url("/api/shorten"))
             .header("content-type", "text/plain")
             .header("x-api-key", app.api_key.to_string())
             .body(format!("{}-{}", test_url, i))
@@ -222,7 +222,7 @@ async fn secure_api_is_rate_limited() {
     // The 3rd request should be rate limited even with valid API key
     let response = app
         .client
-        .post(&app.url("/api/shorten"))
+        .post(app.url("/api/shorten"))
         .header("content-type", "text/plain")
         .header("x-api-key", app.api_key.to_string())
         .body(test_url)
