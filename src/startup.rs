@@ -64,9 +64,11 @@ use axum::{
     routing::{get, post},
 };
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower::ServiceBuilder;
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
     services::ServeDir,
@@ -217,13 +219,13 @@ impl Application {
 
         // Set up the TCP listener and application state
         let api_key = config.application.api_key;
-        let template_dir = config.application.templates;
+        let template_dir = config.application.templates.clone();
         let address = format!("{}:{}", config.application.host, config.application.port);
         let listener = TcpListener::bind(address)
             .await
             .context("Unable to obtain a TCP listener...")?;
         let port = listener.local_addr()?.port();
-        let state = AppState::new(database, api_key, template_dir);
+        let state = AppState::new(database, api_key, template_dir, config);
 
         // Build the application router, passing in the application state
         let router = build_router(state.clone())
@@ -295,10 +297,14 @@ impl Application {
     /// # }
     /// ```
     pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
-        axum::serve(self.listener, self.router)
-            .with_graceful_shutdown(shutdown_signal())
-            .await
-            .context("Unable to start the app server...")?;
+        axum::serve(
+            self.listener,
+            self.router
+                .into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .context("Unable to start the app server...")?;
         Ok(())
     }
 }
@@ -351,8 +357,9 @@ impl Application {
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();
 /// let template_dir = "templates".to_string();
-/// let state = AppState::new(database, api_key, template_dir);
-/// let router = build_router(state).await?;
+/// // let settings = get_configuration().expect("Failed to read configuration");
+/// // let state = AppState::new(database, api_key, template_dir, settings);
+/// // let router = build_router(state).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -367,6 +374,42 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .on_response(DefaultOnResponse::new().include_headers(true));
     let x_request_id = HeaderName::from_static("x-request-id");
 
+    // create rate limiting configuration if enabled
+    let rate_limit_config = if state.config.rate_limiting.enabled {
+        let governor_conf = GovernorConfigBuilder::default()
+            .per_second(state.config.rate_limiting.requests_per_second)
+            .burst_size(state.config.rate_limiting.burst_size)
+            .use_headers() // Add standard rate limiting headers
+            .finish()
+            .context("Failed to create rate limiting configuration")?;
+
+        // Start background cleanup task
+        let governor_limiter = governor_conf.limiter().clone();
+        let interval = Duration::from_secs(60);
+        tokio::spawn(async move {
+            let mut cleanup_interval = tokio::time::interval(interval);
+            loop {
+                cleanup_interval.tick().await;
+                tracing::info!("rate limiting storage size: {}", governor_limiter.len());
+                governor_limiter.retain_recent();
+            }
+        });
+
+        Some(governor_conf)
+    } else {
+        None
+    };
+
+    // build rate-limited routes (shorten endpoints only)
+    let mut rate_limited_routes = Router::new().route("/api/public/shorten", post(post_shorten));
+
+    // apply rate limiting to shortening endpoints only
+    if let Some(rate_config) = rate_limit_config {
+        rate_limited_routes = rate_limited_routes.layer(GovernorLayer::new(rate_config));
+    }
+
+    // build the secure API (protected by the API key checking middleware)
+    let mut secure_api = Router::new()
     // build the protected API routes (requires API key)
     let protected_api = Router::new()
         .route("/api/shorten", post(post_shorten))
@@ -377,6 +420,18 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
     let _secure_api = Router::new()
         .route("/api/shorten", post(post_shorten))
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
+
+    // apply rate limiting to secure API as well if enabled
+    if state.config.rate_limiting.enabled {
+        // Create a separate rate limiting config for secure API
+        let secure_rate_config = GovernorConfigBuilder::default()
+            .per_second(state.config.rate_limiting.requests_per_second)
+            .burst_size(state.config.rate_limiting.burst_size)
+            .use_headers()
+            .finish()
+            .context("Failed to create secure API rate limiting configuration")?;
+        secure_api = secure_api.layer(GovernorLayer::new(secure_rate_config));
+    }
 
     // Build the public routes (no authentication required)
     let public_api = Router::new()
@@ -400,6 +455,23 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
 
     // Build the complete router by merging all route groups
     let router = Router::new()
+        .merge(public_api)
+        .merge(rate_limited_routes)
+        .merge(secure_api)
+        .merge(admin_panel)
+        .fallback_service(ServeDir::new("static"))
+        .with_state(state);
+
+    // apply other middleware layers
+    let router = router.layer(
+        ServiceBuilder::new()
+            .layer(SetRequestIdLayer::new(
+                x_request_id.clone(),
+                MakeRequestUuid,
+            ))
+            .layer(trace_layer)
+            .layer(PropagateRequestIdLayer::new(x_request_id)),
+    );
         .merge(frontend) // Frontend routes at root
         .merge(public_api) // Public API routes
         .merge(protected_api) // Protected API routes

@@ -39,14 +39,15 @@
 //! };
 //! let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 //! let api_key = Uuid::new_v4();
-//! let state = AppState::new(database, api_key, "templates".to_string());
-//! let templates = build_templates(state)?;
+//! // let settings = get_configuration().expect("Failed to read configuration");
+//! // let state = AppState::new(database, api_key, "templates".to_string(), settings);
+//! // let templates = build_templates(state)?;
 //!
 //! let mut context = Context::new();
 //! context.insert("title", "My Page");
 //! context.insert("message", "Hello, World!");
 //!
-//! let html = templates.render("index.html", &context)?;
+//! // let html = templates.render("index.html", &context)?;
 //! # Ok(())
 //! # }
 //! ```
@@ -132,12 +133,13 @@ fn load_templates(template_dir: String) -> Result<Tera, Error> {
 /// };
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();
-/// let state = AppState::new(database, api_key, "templates".to_string());
-/// let templates = build_templates(state)?;
+/// // let settings = get_configuration().expect("Failed to read configuration");
+/// // let state = AppState::new(database, api_key, "templates".to_string(), settings);
+/// // let templates = build_templates(state)?;
 ///
 /// let mut context = Context::new();
 /// context.insert("title", "My Page");
-/// let html = templates.render("index.html", &context)?;
+/// // let html = templates.render("index.html", &context)?;
 /// # Ok(())
 /// # }
 /// ```

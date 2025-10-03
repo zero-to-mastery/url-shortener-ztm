@@ -56,6 +56,7 @@ pub struct Settings {
     pub application: ApplicationSettings,
     /// Database connection and configuration settings
     pub database: DatabaseSettings,
+    pub rate_limiting: RateLimitingSettings,
 }
 
 impl fmt::Display for Settings {
@@ -72,6 +73,14 @@ impl fmt::Display for Settings {
             "  Create if Missing: {}",
             self.database.create_if_missing
         )?;
+        writeln!(f, "Rate Limiting Settings:")?;
+        writeln!(f, "  Enabled: {}", self.rate_limiting.enabled)?;
+        writeln!(
+            f,
+            "  Requests per second: {}",
+            self.rate_limiting.requests_per_second
+        )?;
+        writeln!(f, "  Burst size: {}", self.rate_limiting.burst_size)?;
         Ok(())
     }
 }
@@ -102,6 +111,16 @@ pub struct DatabaseSettings {
     pub database_path: String,
     /// Whether to create the database file if it doesn't exist
     pub create_if_missing: bool,
+}
+
+// struct type to represent rate limiting settings
+#[derive(Clone, Debug, Deserialize)]
+pub struct RateLimitingSettings {
+    pub enabled: bool,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub requests_per_second: u64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub burst_size: u32,
 }
 
 impl DatabaseSettings {

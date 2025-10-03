@@ -7,3 +7,7 @@ database:
   type: sqlite
   database_path: sqlite:database.db
   create_if_missing: true
+rate_limiting:
+  enabled: true
+  requests_per_second: 10
+  burst_size: 5
