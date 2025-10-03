@@ -374,12 +374,12 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .on_response(DefaultOnResponse::new().include_headers(true));
     let x_request_id = HeaderName::from_static("x-request-id");
 
-    // create rate limiting configuration if enabled
-    let rate_limit_config = if state.config.rate_limiting.enabled {
+    // Create rate limiting configuration if enabled
+    let rate_limit_layer = if state.config.rate_limiting.enabled {
         let governor_conf = GovernorConfigBuilder::default()
             .per_second(state.config.rate_limiting.requests_per_second)
             .burst_size(state.config.rate_limiting.burst_size)
-            .use_headers() // Add standard rate limiting headers
+            .use_headers()
             .finish()
             .context("Failed to create rate limiting configuration")?;
 
@@ -395,50 +395,34 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
             }
         });
 
-        Some(governor_conf)
+        Some(GovernorLayer::new(governor_conf))
     } else {
         None
     };
 
-    // build rate-limited routes (shorten endpoints only)
-    let mut rate_limited_routes = Router::new().route("/api/public/shorten", post(post_shorten));
-
-    // apply rate limiting to shortening endpoints only
-    if let Some(rate_config) = rate_limit_config {
-        rate_limited_routes = rate_limited_routes.layer(GovernorLayer::new(rate_config));
-    }
-
-    // build the secure API (protected by the API key checking middleware)
-    let mut secure_api = Router::new()
-    // build the protected API routes (requires API key)
-    let protected_api = Router::new()
-        .route("/api/shorten", post(post_shorten))
-        .route_layer(from_fn_with_state(state.clone(), check_api_key));
-
-    // build the public API routes (no authentication required)
-    // Build the secure API (protected by the API key checking middleware)
-    let _secure_api = Router::new()
-        .route("/api/shorten", post(post_shorten))
-        .route_layer(from_fn_with_state(state.clone(), check_api_key));
-
-    // apply rate limiting to secure API as well if enabled
-    if state.config.rate_limiting.enabled {
-        // Create a separate rate limiting config for secure API
-        let secure_rate_config = GovernorConfigBuilder::default()
-            .per_second(state.config.rate_limiting.requests_per_second)
-            .burst_size(state.config.rate_limiting.burst_size)
-            .use_headers()
-            .finish()
-            .context("Failed to create secure API rate limiting configuration")?;
-        secure_api = secure_api.layer(GovernorLayer::new(secure_rate_config));
-    }
-
-    // Build the public routes (no authentication required)
-    let public_api = Router::new()
+    // Build public routes (no authentication required)
+    let public_routes = Router::new()
+        .route("/", get(get_index))
         .route("/api/health_check", get(health_check))
         .route("/api/redirect/{id}", get(get_redirect));
 
-    // build the protected admin routes (requires API key)
+    // Build public rate-limited shorten endpoint
+    let mut public_shorten = Router::new().route("/api/public/shorten", post(post_shorten));
+
+    if let Some(rate_layer) = rate_limit_layer.clone() {
+        public_shorten = public_shorten.layer(rate_layer);
+    }
+
+    // Build protected API routes (requires API key)
+    let mut protected_api = Router::new()
+        .route("/api/shorten", post(post_shorten))
+        .route_layer(from_fn_with_state(state.clone(), check_api_key));
+
+    if let Some(rate_layer) = rate_limit_layer {
+        protected_api = protected_api.layer(rate_layer);
+    }
+
+    // Build protected admin routes (requires API key)
     let protected_admin = Router::new()
         .route("/admin", get(get_admin_dashboard))
         .route("/admin/profile", get(get_user_profile))
@@ -446,37 +430,13 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .route("/admin/register", get(get_register))
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
-    // build the frontend routes (public, no authentication)
-    let frontend = Router::new().route("/", get(get_index));
-
-    // build the router by merging all route groups
-    // Build the admin panel routes
-    let _admin_panel = Router::new().route("/admin", get(get_index));
-
-    // Build the complete router by merging all route groups
+    // Merge all routes together
     let router = Router::new()
-        .merge(public_api)
-        .merge(rate_limited_routes)
-        .merge(secure_api)
-        .merge(admin_panel)
+        .merge(public_routes)
+        .merge(public_shorten)
+        .merge(protected_api)
+        .merge(protected_admin)
         .fallback_service(ServeDir::new("static"))
-        .with_state(state);
-
-    // apply other middleware layers
-    let router = router.layer(
-        ServiceBuilder::new()
-            .layer(SetRequestIdLayer::new(
-                x_request_id.clone(),
-                MakeRequestUuid,
-            ))
-            .layer(trace_layer)
-            .layer(PropagateRequestIdLayer::new(x_request_id)),
-    );
-        .merge(frontend) // Frontend routes at root
-        .merge(public_api) // Public API routes
-        .merge(protected_api) // Protected API routes
-        .merge(protected_admin) // Protected admin routes
-        .fallback_service(ServeDir::new("static")) // Static assets
         .with_state(state)
         .layer(
             ServiceBuilder::new()
