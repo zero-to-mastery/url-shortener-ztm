@@ -47,8 +47,10 @@
 //! # }
 //! ```
 
+use crate::DatabaseType;
 use crate::configuration::Settings;
-use crate::database::SqliteUrlDatabase;
+use crate::database::postgres_sql::PostgresUrlDatabase;
+use crate::database::{SqliteUrlDatabase, UrlDatabase};
 use crate::middleware::check_api_key;
 use crate::routes::{
     get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
@@ -213,9 +215,19 @@ impl Application {
     /// # }
     /// ```
     pub async fn build(config: Settings) -> Result<Self, anyhow::Error> {
-        // Set up the database connection pool and run migrations
-        let database = Arc::new(SqliteUrlDatabase::from_config(&config.database).await?);
-        database.migrate().await?;
+        // set up the database connection pool and run migrations
+        let database: Arc<dyn UrlDatabase> = match config.database.r#type {
+            DatabaseType::Sqlite => {
+                let db = SqliteUrlDatabase::from_config(&config.database).await?;
+                db.migrate().await?;
+                Arc::new(db) as Arc<dyn UrlDatabase>
+            }
+            DatabaseType::Postgres => {
+                let db = PostgresUrlDatabase::from_config(&config.database).await?;
+                db.migrate().await?;
+                Arc::new(db) as Arc<dyn UrlDatabase>
+            }
+        };
 
         // Set up the TCP listener and application state
         let api_key = config.application.api_key;
@@ -344,6 +356,7 @@ impl Application {
 /// ```rust,no_run
 /// use url_shortener_ztm_lib::startup::build_router;
 /// use url_shortener_ztm_lib::state::AppState;
+/// use url_shortener_ztm_lib::DatabaseType;
 /// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
 /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
 /// use std::sync::Arc;
@@ -351,7 +364,8 @@ impl Application {
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let config = DatabaseSettings {
-///     database_path: "database.db".to_string(),
+///     r#type: DatabaseType::Sqlite,
+///     url: "database.db".to_string(),
 ///     create_if_missing: true,
 /// };
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);

@@ -24,16 +24,18 @@
 //! ## Usage
 //!
 //! ```rust,no_run
+//! use url_shortener_ztm_lib::DatabaseType;
 //! use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
 //! use url_shortener_ztm_lib::configuration::DatabaseSettings;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create database from configuration
 //! let config = DatabaseSettings {
-//!     database_path: "database.db".to_string(),
+//!    r#type: DatabaseType::Sqlite,
+//!     url: "database.db".to_string(),
 //!     create_if_missing: true,
 //! };
-//! let config = DatabaseSettings { database_path: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+//! let db = SqliteUrlDatabase::from_config(&config).await?;
 //!
 //! // Run migrations to set up the schema
 //! db.migrate().await?;
@@ -67,10 +69,12 @@ use std::str::FromStr;
 /// ```rust,no_run
 /// use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
 /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
+/// use url_shortener_ztm_lib::DatabaseType;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let config = DatabaseSettings {
-///     database_path: "database.db".to_string(),
+///     r#type: DatabaseType::Sqlite,
+///     url: "database.db".to_string(),
 ///     create_if_missing: true,
 /// };
 /// let db = SqliteUrlDatabase::from_config(&config).await?;
@@ -122,15 +126,17 @@ impl SqliteUrlDatabase {
     /// # Examples
     ///
     /// ```rust,no_run
+    /// use url_shortener_ztm_lib::DatabaseType;
     /// use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let config = DatabaseSettings {
-    ///     database_path: "database.db".to_string(),
+    ///     r#type: DatabaseType::Sqlite,
+    ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
     /// };
-    /// let config = DatabaseSettings { database_path: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let db = SqliteUrlDatabase::from_config(&config).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -156,11 +162,12 @@ impl SqliteUrlDatabase {
     /// # Examples
     ///
     /// ```rust,no_run
+    /// use url_shortener_ztm_lib::DatabaseType;
     /// use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { database_path: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// db.migrate().await?; // Set up the database schema
     /// # Ok(())
     /// # }
@@ -196,11 +203,12 @@ impl UrlDatabase for SqliteUrlDatabase {
     /// # Examples
     ///
     /// ```rust,no_run
+    /// use url_shortener_ztm_lib::DatabaseType;
     /// use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { database_path: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// db.insert_url("abc123", "https://example.com").await?;
     /// # Ok(())
     /// # }
@@ -240,11 +248,12 @@ impl UrlDatabase for SqliteUrlDatabase {
     /// # Examples
     ///
     /// ```rust,no_run
+    /// use url_shortener_ztm_lib::DatabaseType;
     /// use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { database_path: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// let url = db.get_url("abc123").await?;
     /// println!("Original URL: {}", url);
     /// # Ok(())
@@ -281,12 +290,14 @@ impl UrlDatabase for SqliteUrlDatabase {
 /// # Examples
 ///
 /// ```rust,no_run
+/// use url_shortener_ztm_lib::DatabaseType;
 /// use url_shortener_ztm_lib::database::get_connection_pool;
 /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let config = DatabaseSettings {
-///     database_path: "database.db".to_string(),
+///     r#type: DatabaseType::Sqlite,
+///     url: "database.db".to_string(),
 ///     create_if_missing: true,
 /// };
 /// let pool = get_connection_pool(&config).await?;

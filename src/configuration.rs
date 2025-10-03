@@ -33,7 +33,7 @@
 //!   templates: "templates"
 //!
 //! database:
-//!   database_path: "database.db"
+//!   url: "database.db"
 //!   create_if_missing: true
 //! ```
 
@@ -67,7 +67,8 @@ impl fmt::Display for Settings {
         writeln!(f, "  API Key: {}", self.application.api_key)?;
         writeln!(f, "  Templates: {}", self.application.templates)?;
         writeln!(f, "Database Settings:")?;
-        writeln!(f, "  Database Path: {}", self.database.database_path)?;
+        writeln!(f, "  Database Type: {:?}", self.database.r#type)?;
+        writeln!(f, "  Database URL: {}", self.database.url)?;
         writeln!(
             f,
             "  Create if Missing: {}",
@@ -102,14 +103,27 @@ pub struct ApplicationSettings {
     pub templates: String,
 }
 
+/// Supported database types.
+///
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DatabaseType {
+    Sqlite,
+    Postgres,
+}
+
 /// Database configuration settings.
 ///
 /// Contains settings for database connection and initialization.
 #[derive(Clone, Debug, Deserialize)]
 pub struct DatabaseSettings {
+    /// Type of the database (e.g., SQLite, PostgreSQL)
+    pub r#type: DatabaseType,
     /// Path to the SQLite database file (or ":memory:" for in-memory database)
-    pub database_path: String,
+    #[serde(alias = "database_path")]
+    pub url: String,
     /// Whether to create the database file if it doesn't exist
+    #[serde(default)]
     pub create_if_missing: bool,
 }
 
@@ -134,25 +148,33 @@ impl DatabaseSettings {
     /// # Examples
     ///
     /// ```rust
+    /// use url_shortener_ztm_lib::DatabaseType;
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// let config = DatabaseSettings {
-    ///     database_path: "database.db".to_string(),
+    ///     r#type: DatabaseType::Sqlite,
+    ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
     /// };
     /// assert_eq!(config.connection_string(), "sqlite:database.db");
     ///
     /// let memory_config = DatabaseSettings {
-    ///     database_path: ":memory:".to_string(),
+    ///     r#type: DatabaseType::Sqlite,
+    ///     url: ":memory:".to_string(),
     ///     create_if_missing: true,
     /// };
     /// assert_eq!(memory_config.connection_string(), "sqlite::memory:");
     /// ```
     pub fn connection_string(&self) -> String {
-        if self.database_path == ":memory:" {
-            "sqlite::memory:".to_string()
-        } else {
-            format!("sqlite:{}", self.database_path)
+        match self.r#type {
+            DatabaseType::Sqlite => {
+                if self.url == ":memory:" {
+                    "sqlite::memory:".to_string()
+                } else {
+                    format!("sqlite:{}", self.url)
+                }
+            }
+            _ => self.url.clone(),
         }
     }
 }

@@ -6,6 +6,7 @@
 
 # environment variables
 .env
+.envrc
 .direnv
 
 # system files

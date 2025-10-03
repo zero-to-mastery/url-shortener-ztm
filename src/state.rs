@@ -57,6 +57,7 @@ use uuid::Uuid;
 ///
 /// ```rust,no_run
 /// use url_shortener_ztm_lib::state::AppState;
+/// use url_shortener_ztm_lib::DatabaseType;
 /// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
 /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
 /// use std::sync::Arc;
@@ -64,7 +65,8 @@ use uuid::Uuid;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let config = DatabaseSettings {
-///     database_path: "database.db".to_string(),
+///     r#type: DatabaseType::Sqlite,
+///     url: "database.db".to_string(),
 ///     create_if_missing: true,
 /// };
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
@@ -108,6 +110,7 @@ impl AppState {
     ///
     /// ```rust,no_run
     /// use url_shortener_ztm_lib::state::AppState;
+    /// use url_shortener_ztm_lib::DatabaseType;
     /// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
     /// use url_shortener_ztm_lib::configuration::{DatabaseSettings, Settings};
     /// use std::sync::Arc;
@@ -115,7 +118,8 @@ impl AppState {
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let config = DatabaseSettings {
-    ///     database_path: "database.db".to_string(),
+    ///     r#type: DatabaseType::Sqlite,
+    ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
     /// };
     /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);

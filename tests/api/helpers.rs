@@ -43,7 +43,7 @@ pub async fn spawn_app() -> TestApp {
     let configuration = {
         let mut c = get_configuration().expect("Failed to read configuration");
         c.application.port = 0;
-        c.database.database_path = "sqlite::memory:".to_string();
+        c.database.url = "sqlite::memory:".to_string();
         // Use more lenient rate limiting for tests (higher rate, smaller burst)
         c.rate_limiting.requests_per_second = 100; // 100 req/sec for fast tests
         c.rate_limiting.burst_size = 2; // Smaller burst for predictable testing
