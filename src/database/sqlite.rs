@@ -35,7 +35,6 @@
 //!     url: "database.db".to_string(),
 //!     create_if_missing: true,
 //! };
-//! let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, };
 //! let db = SqliteUrlDatabase::from_config(&config).await?;
 //!
 //! // Run migrations to set up the schema
@@ -137,7 +136,7 @@ impl SqliteUrlDatabase {
     ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
     /// };
-    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let db = SqliteUrlDatabase::from_config(&config).await?;
     /// # Ok(())
     /// # }
     /// ```
