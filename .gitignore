@@ -1,6 +1,6 @@
 # .gitignore configuration
 
-# IDE VS code settings
+# VScode, Idea settings
 .vscode
 .idea
 
@@ -20,3 +20,4 @@
 # Ignore local DBs and weird files
 *.db
 NUL
+.pre-commit-config.yaml
