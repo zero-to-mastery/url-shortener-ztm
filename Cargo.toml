@@ -1,6 +1,6 @@
 [package]
 name = "url-shortener-ztm"
-version = "0.6.0"
+version = "0.8.1"
 edition = "2024"
 
 [[bin]]
@@ -27,6 +27,7 @@ thiserror = "2.0.17"
 tokio = { version = "1.45.1", features = [ "macros", "net", "rt-multi-thread", "signal" ] }
 tower = "0.5.2"
 tower-http = { version = "0.6.6", features = [ "fs", "request-id", "trace" ] }
+tower_governor = "0.8.0"
 tracing = { version = "0.1.41", features = ["log"] }
 tracing-bunyan-formatter = "0.3.10"
 tracing-log = "0.2.0"

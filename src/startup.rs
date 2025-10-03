@@ -52,7 +52,10 @@ use crate::configuration::Settings;
 use crate::database::postgres_sql::PostgresUrlDatabase;
 use crate::database::{SqliteUrlDatabase, UrlDatabase};
 use crate::middleware::check_api_key;
-use crate::routes::{get_index, get_redirect, health_check, post_shorten};
+use crate::routes::{
+    get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
+    health_check, post_shorten,
+};
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use anyhow::{Context, Result};
@@ -63,9 +66,11 @@ use axum::{
     routing::{get, post},
 };
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower::ServiceBuilder;
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
     services::ServeDir,
@@ -226,13 +231,13 @@ impl Application {
 
         // Set up the TCP listener and application state
         let api_key = config.application.api_key;
-        let template_dir = config.application.templates;
+        let template_dir = config.application.templates.clone();
         let address = format!("{}:{}", config.application.host, config.application.port);
         let listener = TcpListener::bind(address)
             .await
             .context("Unable to obtain a TCP listener...")?;
         let port = listener.local_addr()?.port();
-        let state = AppState::new(database, api_key, template_dir);
+        let state = AppState::new(database, api_key, template_dir, config);
 
         // Build the application router, passing in the application state
         let router = build_router(state.clone())
@@ -304,10 +309,14 @@ impl Application {
     /// # }
     /// ```
     pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
-        axum::serve(self.listener, self.router)
-            .with_graceful_shutdown(shutdown_signal())
-            .await
-            .context("Unable to start the app server...")?;
+        axum::serve(
+            self.listener,
+            self.router
+                .into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .context("Unable to start the app server...")?;
         Ok(())
     }
 }
@@ -362,8 +371,9 @@ impl Application {
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();
 /// let template_dir = "templates".to_string();
-/// let state = AppState::new(database, api_key, template_dir);
-/// let router = build_router(state).await?;
+/// // let settings = get_configuration().expect("Failed to read configuration");
+/// // let state = AppState::new(database, api_key, template_dir, settings);
+/// // let router = build_router(state).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -378,25 +388,68 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .on_response(DefaultOnResponse::new().include_headers(true));
     let x_request_id = HeaderName::from_static("x-request-id");
 
-    // Build the secure API (protected by the API key checking middleware)
-    let secure_api = Router::new()
+    // Create rate limiting configuration if enabled
+    let rate_limit_layer = if state.config.rate_limiting.enabled {
+        let governor_conf = GovernorConfigBuilder::default()
+            .per_second(state.config.rate_limiting.requests_per_second)
+            .burst_size(state.config.rate_limiting.burst_size)
+            .use_headers()
+            .finish()
+            .context("Failed to create rate limiting configuration")?;
+
+        // Start background cleanup task
+        let governor_limiter = governor_conf.limiter().clone();
+        let interval = Duration::from_secs(60);
+        tokio::spawn(async move {
+            let mut cleanup_interval = tokio::time::interval(interval);
+            loop {
+                cleanup_interval.tick().await;
+                tracing::info!("rate limiting storage size: {}", governor_limiter.len());
+                governor_limiter.retain_recent();
+            }
+        });
+
+        Some(GovernorLayer::new(governor_conf))
+    } else {
+        None
+    };
+
+    // Build public routes (no authentication required)
+    let public_routes = Router::new()
+        .route("/", get(get_index))
+        .route("/api/health_check", get(health_check))
+        .route("/api/redirect/{id}", get(get_redirect));
+
+    // Build public rate-limited shorten endpoint
+    let mut public_shorten = Router::new().route("/api/public/shorten", post(post_shorten));
+
+    if let Some(rate_layer) = rate_limit_layer.clone() {
+        public_shorten = public_shorten.layer(rate_layer);
+    }
+
+    // Build protected API routes (requires API key)
+    let mut protected_api = Router::new()
         .route("/api/shorten", post(post_shorten))
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
-    // Build the public routes (no authentication required)
-    let public_api = Router::new()
-        .route("/api/health_check", get(health_check))
-        .route("/api/redirect/{id}", get(get_redirect))
-        .route("/api/public/shorten", post(post_shorten));
+    if let Some(rate_layer) = rate_limit_layer {
+        protected_api = protected_api.layer(rate_layer);
+    }
 
-    // Build the admin panel routes
-    let admin_panel = Router::new().route("/admin", get(get_index));
+    // Build protected admin routes (requires API key)
+    let protected_admin = Router::new()
+        .route("/admin", get(get_admin_dashboard))
+        .route("/admin/profile", get(get_user_profile))
+        .route("/admin/login", get(get_login))
+        .route("/admin/register", get(get_register))
+        .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
-    // Build the complete router by merging all route groups
+    // Merge all routes together
     let router = Router::new()
-        .merge(public_api)
-        .merge(secure_api)
-        .merge(admin_panel)
+        .merge(public_routes)
+        .merge(public_shorten)
+        .merge(protected_api)
+        .merge(protected_admin)
         .fallback_service(ServeDir::new("static"))
         .with_state(state)
         .layer(

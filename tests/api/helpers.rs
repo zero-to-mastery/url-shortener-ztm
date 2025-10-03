@@ -44,6 +44,9 @@ pub async fn spawn_app() -> TestApp {
         let mut c = get_configuration().expect("Failed to read configuration");
         c.application.port = 0;
         c.database.url = "sqlite::memory:".to_string();
+        // Use more lenient rate limiting for tests (higher rate, smaller burst)
+        c.rate_limiting.requests_per_second = 100; // 100 req/sec for fast tests
+        c.rate_limiting.burst_size = 2; // Smaller burst for predictable testing
         c
     };
 
@@ -57,11 +60,12 @@ pub async fn spawn_app() -> TestApp {
     // Store the API key for use in tests
     let api_key = configuration.application.api_key;
 
-    let test_app_state = AppState {
-        database: database.clone(),
+    let test_app_state = AppState::new(
+        database.clone(),
         api_key,
-        template_dir: configuration.application.templates,
-    };
+        configuration.application.templates.clone(),
+        configuration.clone(),
+    );
 
     // Launch the application as a background task
     let test_app = build_router(test_app_state.clone())
@@ -73,9 +77,12 @@ pub async fn spawn_app() -> TestApp {
     let test_app_port = listener.local_addr().unwrap().port();
 
     tokio::spawn(async move {
-        axum::serve(listener, test_app)
-            .await
-            .expect("Failed to serve application")
+        axum::serve(
+            listener,
+            test_app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .expect("Failed to serve application")
     });
 
     // Create an HTTP client for making requests to the application
@@ -152,6 +159,48 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute POST request")
+    }
+
+    // Admin route helpers
+    pub async fn get_admin_dashboard(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin"))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    pub async fn get_admin_dashboard_with_api_key(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin"))
+            .header("x-api-key", self.api_key.to_string())
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    pub async fn get_admin_login(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin/login"))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    pub async fn get_admin_register(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin/register"))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
+    }
+
+    pub async fn get_admin_profile(&self) -> reqwest::Response {
+        self.client
+            .get(self.url("/admin/profile"))
+            .send()
+            .await
+            .expect("Failed to execute GET request")
     }
 }
 

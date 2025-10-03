@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="hero">
+    <h2>User Profile</h2>
+    <p>{{ message }}</p>
+  </div>
+  
+  <div class="profile-section">
+    <div class="profile-info">
+      <h3>Profile Information</h3>
+      <form class="profile-form">
+        <div class="form-group">
+          <label for="username">Username:</label>
+          <input type="text" id="username" name="username" value="admin" readonly>
+        </div>
+        <div class="form-group">
+          <label for="email">Email:</label>
+          <input type="email" id="email" name="email" value="admin@example.com">
+        </div>
+        <div class="form-group">
+          <label for="created">Member Since:</label>
+          <input type="text" id="created" name="created" value="2025-01-01" readonly>
+        </div>
+        <button type="submit" class="btn primary">Update Profile</button>
+      </form>
+    </div>
+    
+    <div class="urls-section">
+      <h3>Your Shortened URLs</h3>
+      <div class="urls-list">
+        <div class="url-item">
+          <div class="url-info">
+            <span class="short-url">https://short.ly/abc123</span>
+            <span class="original-url">https://example.com/very/long/url</span>
+            <span class="clicks">Clicks: 42</span>
+          </div>
+          <div class="url-actions">
+            <button class="btn small">Copy</button>
+            <button class="btn small danger">Delete</button>
+          </div>
+        </div>
+        
+        <div class="url-item">
+          <div class="url-info">
+            <span class="short-url">https://short.ly/def456</span>
+            <span class="original-url">https://another-example.com/path</span>
+            <span class="clicks">Clicks: 15</span>
+          </div>
+          <div class="url-actions">
+            <button class="btn small">Copy</button>
+            <button class="btn small danger">Delete</button>
+          </div>
+        </div>
+        
+        <p class="empty-state" style="display: none;">You haven't created any shortened URLs yet.</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="profile-actions">
+    <a href="/admin" class="btn secondary">Back to Dashboard</a>
+    <a href="/" class="btn secondary">Home</a>
+  </div>
+</div>
+{% endblock content %}

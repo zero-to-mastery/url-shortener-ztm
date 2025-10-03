@@ -1,2 +1,6 @@
 application:
   host: 127.0.0.1
+rate_limiting:
+  enabled: true
+  requests_per_second: 20  # More for local development
+  burst_size: 10
