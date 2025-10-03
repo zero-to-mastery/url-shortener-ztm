@@ -392,8 +392,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
     // build the frontend routes (public, no authentication)
-    let frontend = Router::new()
-        .route("/", get(get_index));
+    let frontend = Router::new().route("/", get(get_index));
 
     // build the router by merging all route groups
     // Build the admin panel routes
@@ -401,11 +400,11 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
 
     // Build the complete router by merging all route groups
     let router = Router::new()
-        .merge(frontend)          // Frontend routes at root
-        .merge(public_api)        // Public API routes
-        .merge(protected_api)     // Protected API routes
-        .merge(protected_admin)   // Protected admin routes
-        .fallback_service(ServeDir::new("static"))  // Static assets
+        .merge(frontend) // Frontend routes at root
+        .merge(public_api) // Public API routes
+        .merge(protected_api) // Protected API routes
+        .merge(protected_admin) // Protected admin routes
+        .fallback_service(ServeDir::new("static")) // Static assets
         .with_state(state)
         .layer(
             ServiceBuilder::new()
