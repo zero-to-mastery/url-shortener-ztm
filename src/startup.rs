@@ -50,7 +50,10 @@
 use crate::configuration::Settings;
 use crate::database::SqliteUrlDatabase;
 use crate::middleware::check_api_key;
-use crate::routes::{get_index, get_redirect, health_check, post_shorten};
+use crate::routes::{
+    get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
+    health_check, post_shorten,
+};
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use anyhow::{Context, Result};
@@ -407,6 +410,14 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
 
     // build the secure API (protected by the API key checking middleware)
     let mut secure_api = Router::new()
+    // build the protected API routes (requires API key)
+    let protected_api = Router::new()
+        .route("/api/shorten", post(post_shorten))
+        .route_layer(from_fn_with_state(state.clone(), check_api_key));
+
+    // build the public API routes (no authentication required)
+    // Build the secure API (protected by the API key checking middleware)
+    let _secure_api = Router::new()
         .route("/api/shorten", post(post_shorten))
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
@@ -427,8 +438,20 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .route("/api/health_check", get(health_check))
         .route("/api/redirect/{id}", get(get_redirect));
 
+    // build the protected admin routes (requires API key)
+    let protected_admin = Router::new()
+        .route("/admin", get(get_admin_dashboard))
+        .route("/admin/profile", get(get_user_profile))
+        .route("/admin/login", get(get_login))
+        .route("/admin/register", get(get_register))
+        .route_layer(from_fn_with_state(state.clone(), check_api_key));
+
+    // build the frontend routes (public, no authentication)
+    let frontend = Router::new().route("/", get(get_index));
+
+    // build the router by merging all route groups
     // Build the admin panel routes
-    let admin_panel = Router::new().route("/admin", get(get_index));
+    let _admin_panel = Router::new().route("/admin", get(get_index));
 
     // Build the complete router by merging all route groups
     let router = Router::new()
@@ -449,6 +472,21 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
             .layer(trace_layer)
             .layer(PropagateRequestIdLayer::new(x_request_id)),
     );
+        .merge(frontend) // Frontend routes at root
+        .merge(public_api) // Public API routes
+        .merge(protected_api) // Protected API routes
+        .merge(protected_admin) // Protected admin routes
+        .fallback_service(ServeDir::new("static")) // Static assets
+        .with_state(state)
+        .layer(
+            ServiceBuilder::new()
+                .layer(SetRequestIdLayer::new(
+                    x_request_id.clone(),
+                    MakeRequestUuid,
+                ))
+                .layer(trace_layer)
+                .layer(PropagateRequestIdLayer::new(x_request_id)),
+        );
 
     Ok(router)
 }
