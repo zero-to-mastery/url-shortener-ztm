@@ -13,6 +13,10 @@ use axum_macros::debug_handler;
 use tracing::instrument;
 use url::Url;
 
+// Define a conservative maximum URL length. Many browsers support ~2k-8k, but
+// we choose 2048 to prevent abuse while allowing realistic URLs.
+const MAX_URL_LENGTH: usize = 2048;
+
 /// URL shortening handler that creates short URLs from long URLs.
 ///
 /// This handler processes requests to shorten URLs by generating a unique
@@ -118,6 +122,13 @@ pub async fn post_shorten(
     url: String,
 ) -> Result<impl IntoResponse, ApiError> {
     let id = &nanoid::nanoid!(6);
+    // Enforce a maximum length on the input to avoid excessive memory usage or abuse
+    if url.len() > MAX_URL_LENGTH {
+        return Err(ApiError::Unprocessable(format!(
+            "URL exceeds maximum allowed length of {} characters",
+            MAX_URL_LENGTH
+        )));
+    }
     let p_url = Url::parse(&url).map_err(|e| {
         tracing::error!("Unable to parse URL");
         ApiError::Unprocessable(e.to_string())
