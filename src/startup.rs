@@ -374,7 +374,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
 
     // build the public API routes (no authentication required)
     // Build the secure API (protected by the API key checking middleware)
-    let secure_api = Router::new()
+    let _secure_api = Router::new()
         .route("/api/shorten", post(post_shorten))
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
@@ -396,7 +396,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
 
     // build the router by merging all route groups
     // Build the admin panel routes
-    let admin_panel = Router::new().route("/admin", get(get_index));
+    let _admin_panel = Router::new().route("/admin", get(get_index));
 
     // Build the complete router by merging all route groups
     let router = Router::new()
