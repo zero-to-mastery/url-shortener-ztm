@@ -48,6 +48,7 @@ pub mod admin;
 // Module declarations
 pub mod health_check;
 pub mod index;
+pub mod realworld;
 pub mod redirect;
 pub mod shorten;
 
@@ -56,5 +57,6 @@ pub use admin::*;
 // Re-exports for convenience
 pub use health_check::*;
 pub use index::*;
+pub use realworld::*;
 pub use redirect::*;
 pub use shorten::*;
