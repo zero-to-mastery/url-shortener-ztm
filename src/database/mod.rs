@@ -25,7 +25,7 @@
 // # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 // // Create database from configuration
 // let db = SqliteUrlDatabase::from_config(&DatabaseSettings {
-//     database_path: "database.db".to_string(),
+//     url: "database.db".to_string(),
 //     create_if_missing: true,
 // }).await?;
 //
@@ -44,7 +44,8 @@
 use async_trait::async_trait;
 use std::fmt;
 
-// Module declarations
+// module declarations
+pub mod postgres_sql;
 pub mod sqlite;
 
 // Re-exports for convenience

@@ -24,6 +24,7 @@
 //!
 //! ```rust,no_run
 //! use url_shortener_ztm_lib::templates::build_templates;
+//! use url_shortener_ztm_lib::DatabaseType;
 //! use url_shortener_ztm_lib::state::AppState;
 //! use tera::Context;
 //!
@@ -34,7 +35,8 @@
 //! use uuid::Uuid;
 //!
 //! let config = DatabaseSettings {
-//!     database_path: "database.db".to_string(),
+//!     r#type: DatabaseType::Sqlite,
+//!     url: "database.db".to_string(),
 //!     create_if_missing: true,
 //! };
 //! let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
@@ -118,6 +120,7 @@ fn load_templates(template_dir: String) -> Result<Tera, Error> {
 ///
 /// ```rust,no_run
 /// use url_shortener_ztm_lib::templates::build_templates;
+/// use url_shortener_ztm_lib::DatabaseType;
 /// use url_shortener_ztm_lib::state::AppState;
 /// use tera::Context;
 ///
@@ -128,7 +131,8 @@ fn load_templates(template_dir: String) -> Result<Tera, Error> {
 /// use uuid::Uuid;
 ///
 /// let config = DatabaseSettings {
-///     database_path: "database.db".to_string(),
+///     r#type: DatabaseType::Sqlite,
+///     url: "database.db".to_string(),
 ///     create_if_missing: true,
 /// };
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);

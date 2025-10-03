@@ -1,10 +1,13 @@
 # .gitignore configuration
 
-# VS code settings
+# IDE VS code settings
 .vscode
+.idea
 
 # environment variables
 .env
+.envrc
+.direnv
 
 # system files
 .DS_Store
