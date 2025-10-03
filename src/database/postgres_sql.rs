@@ -29,7 +29,7 @@ impl PostgresUrlDatabase {
 
     // Run migrations
     pub async fn migrate(&self) -> Result<(), DatabaseError> {
-        sqlx::migrate!("./migrations")
+        sqlx::migrate!("./migrations/pg")
             .run(&self.pool)
             .await
             .map_err(|e| DatabaseError::MigrationError(e.to_string()))?;

@@ -5,6 +5,11 @@ on:
     types:
       - opened
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -13,6 +18,8 @@ jobs:
   addLabel:
     name: Hacktoberfest Label
     runs-on: ubuntu-latest
+    permissions:
+      issues: write 
     steps:
       - name: Check if it's October
         id: check_month
@@ -23,7 +30,7 @@ jobs:
         uses: actions/github-script@v7
         if: steps.check_month.outputs.isoctober == 'true'
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
           script: |
             github.rest.issues.addLabels({
               issue_number: context.issue.number,

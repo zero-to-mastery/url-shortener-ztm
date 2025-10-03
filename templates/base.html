@@ -3,15 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Shorten your URLs quickly and securely. Create short, shareable links in seconds with our powerful URL shortener.">
+  <meta name="keywords" content="URL shortener, link shortener, short links, URL compression, link management">
+  <meta name="author" content="Jeffery D Mitchell">
   <link rel="stylesheet" type="text/css" href="screen.css" media="screen" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <title>{{ title }} | {{ page }}</title>
 </head>
 <body>
-  <h1>URL Shortener</h1>
+  <header>
+    <nav class="nav" role="navigation" aria-label="Main navigation">
+      <div class="nav-brand">
+        <h1> URL Shortener</h1>
+      </div>
+    </nav>
+  </header>
+  
   <main>
     {% block content %}{% endblock content %}
   </main>
-  <footer>
+  
+  <footer role="contentinfo">
     <p>&copy; <span id="year"></span><noscript>2025</noscript> Jeffery D Mitchell | All Rights Reserved</p>
   </footer>
   <script type="module" src="scripts.js"></script>
