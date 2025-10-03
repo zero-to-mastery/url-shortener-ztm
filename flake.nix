@@ -88,6 +88,12 @@
           sqlite
         ];
 
+        # Convert ymal to JSON for environment preparation
+        baseConfig = pkgs.runCommand "yaml-to-json" { } ''
+          ${pkgs.yq-go}/bin/yq -o=json '.' ${./configuration/base.yml} > $out
+        '';
+        finalConfig = builtins.fromJSON (builtins.readFile baseConfig);
+
         # Rust ≥1.90 uses lld by default. On NixOS this can fail due to missing system linker.
         # We set clang + lld explicitly to avoid "linker not found" errors.
         commonRustEnv = {
@@ -108,7 +114,8 @@
               nativeBuildInputs = [ pkgs.pkg-config ];
 
               shellHook = ''
-                echo "[info] Using Fenix (stable) Rust toolchain."
+                # Export key variables from the parsed config
+                # export API_KEY=${finalConfig.application.api_key}
 
                 # Ensure OpenSSL libs are available at runtime
                 export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.openssl ]}:$LD_LIBRARY_PATH"
@@ -116,6 +123,8 @@
                 # Optional: enable pre-commit hook installation inside the dev shell
                 # Uncomment the line below to activate
                 # ''${pre-commit-check.shellHook}
+
+                echo "[info] Using Fenix (stable) Rust toolchain."
               '';
             }
           );
