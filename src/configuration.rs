@@ -46,6 +46,8 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 use std::fmt;
 use uuid::Uuid;
 
+use crate::generator::config::ShortenerConfig;
+
 /// Complete application settings containing all configuration sections.
 ///
 /// This struct represents the entire application configuration, including
@@ -57,6 +59,7 @@ pub struct Settings {
     /// Database connection and configuration settings
     pub database: DatabaseSettings,
     pub rate_limiting: RateLimitingSettings,
+    pub shortener: ShortenerConfig,
 }
 
 impl fmt::Display for Settings {
@@ -303,6 +306,7 @@ pub fn get_configuration() -> Result<Settings, Box<figment::Error>> {
 
     let settings: Settings = Figment::new()
         .merge(Yaml::file(configuration_directory.join("base.yml")))
+        .merge(Yaml::file(configuration_directory.join("generator.yml")))
         .merge(Yaml::file(
             configuration_directory.join(environment_filename),
         ))

@@ -75,6 +75,7 @@
 pub mod configuration;
 pub mod database;
 pub mod errors;
+pub mod generator;
 pub mod middleware;
 pub mod response;
 pub mod routes;

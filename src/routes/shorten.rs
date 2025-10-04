@@ -127,7 +127,10 @@ pub async fn post_shorten(
     TypedHeader(header): TypedHeader<Host>,
     url: String,
 ) -> Result<impl IntoResponse, ApiError> {
-    let id = &nanoid::nanoid!(6);
+    let id = state.code_generator.generate().map_err(|e| {
+        tracing::error!("Code generation error: {:?}", e);
+        ApiError::Internal("Code generation failed".to_string())
+    })?;
 
     // Validate URL length before parsing to prevent resource exhaustion
     if url.len() > MAX_URL_LENGTH {
@@ -147,7 +150,8 @@ pub async fn post_shorten(
         ApiError::Unprocessable(e.to_string())
     })?;
     let host = "localhost";
-    match state.database.insert_url(id, p_url.as_str()).await {
+
+    match state.database.insert_url(id.as_ref(), p_url.as_str()).await {
         Ok(()) => {
             let response_body = format!("https://{}/{}\n", host, id);
             tracing::info!("URL shortened and saved successfully...");

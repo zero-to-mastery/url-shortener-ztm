@@ -6,6 +6,7 @@ use reqwest::header::CONTENT_TYPE;
 use serde_json::Value;
 use std::sync::{Arc, LazyLock};
 use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
+use url_shortener_ztm_lib::generator::build_generator;
 use url_shortener_ztm_lib::get_configuration;
 use url_shortener_ztm_lib::startup::build_router;
 use url_shortener_ztm_lib::state::AppState;
@@ -56,12 +57,14 @@ pub async fn spawn_app() -> TestApp {
         .expect("Failed to create database");
     sqlite_db.migrate().await.expect("Failed to run migrations");
     let database = Arc::new(sqlite_db);
+    let code_generator = build_generator(&configuration.shortener);
 
     // Store the API key for use in tests
     let api_key = configuration.application.api_key;
 
     let test_app_state = AppState::new(
         database.clone(),
+        code_generator,
         api_key,
         configuration.application.templates.clone(),
         configuration.clone(),

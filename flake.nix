@@ -69,7 +69,13 @@
             # rustfmt.enable = true;
 
             # Optional: Clippy linting (disabled by default)
-            # clippy.enable = true;
+            clippy = {
+              enable = true;
+              settings = {
+                allFeatures = true;
+                extraArgs = "--all-targets -- -D warnings";
+              };
+            };
           };
         };
 

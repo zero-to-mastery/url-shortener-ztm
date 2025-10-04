@@ -24,7 +24,7 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.text().await.expect("Failed to read response body");
     let hostname = "localhost";
-    let pattern = format!(r"^https://{}/[A-Za-z0-9_-]{{6}}\n$", hostname);
+    let pattern = format!(r"^https://{}/[A-Za-z0-9]{{7}}\n$", hostname);
     let regex = Regex::new(&pattern).expect("Failed to compile regex");
     assert!(regex.is_match(&body));
 }

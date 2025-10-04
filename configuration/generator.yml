@@ -1,0 +1,16 @@
+shortener:
+    length: 7
+    alphabet: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    engine:
+        kind: "nanoid"
+        sequence:
+            block_size: 65536
+            persist_interval: 1024
+            state_path: "./data/seq_state.bin"
+    bit_layout:
+        enabled: false
+        region_bits: 6
+        shard_bits: 10
+        payload_bits: 26
+        region_id: 0
+        shard_id: 1
