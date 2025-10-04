@@ -154,13 +154,13 @@ impl ShortCodeGenerator for SequenceEngine {
 
 /// State file stores `next_global` as little-endian u64.
 fn load_state(path: &Option<PathBuf>) -> Result<u64, std::io::Error> {
-    if let Some(p) = path {
-        if p.exists() {
-            let mut f = fs::File::open(p)?;
-            let mut buf = [0u8; 8];
-            f.read_exact(&mut buf)?;
-            return Ok(u64::from_le_bytes(buf));
-        }
+    if let Some(p) = path
+        && p.exists()
+    {
+        let mut f = fs::File::open(p)?;
+        let mut buf = [0u8; 8];
+        f.read_exact(&mut buf)?;
+        return Ok(u64::from_le_bytes(buf));
     }
     Ok(0)
 }

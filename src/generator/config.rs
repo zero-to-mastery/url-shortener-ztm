@@ -78,10 +78,10 @@ impl ShortenerConfig {
             }
         }
 
-        if let Some(b) = &self.bit_layout {
-            if b.enabled {
-                todo!("bit layout validation not implemented yet");
-            }
+        if let Some(b) = &self.bit_layout
+            && b.enabled
+        {
+            todo!("bit layout validation not implemented yet");
         }
 
         Ok(())
