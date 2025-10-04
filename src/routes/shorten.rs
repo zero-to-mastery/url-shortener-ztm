@@ -13,6 +13,12 @@ use axum_macros::debug_handler;
 use tracing::instrument;
 use url::Url;
 
+/// Maximum allowed URL length in characters.
+///
+/// RFC 2616 doesn't specify a limit, but most browsers support 2000+ characters.
+/// We use 2048 as a reasonable limit to prevent abuse while supporting legitimate URLs.
+const MAX_URL_LENGTH: usize = 2048;
+
 /// URL shortening handler that creates short URLs from long URLs.
 ///
 /// This handler processes requests to shorten URLs by generating a unique
@@ -56,7 +62,7 @@ use url::Url;
 /// # Status Codes
 ///
 /// - `200 OK` - URL shortened successfully
-/// - `422 Unprocessable Entity` - Invalid URL format
+/// - `422 Unprocessable Entity` - Invalid URL format or URL exceeds maximum length
 /// - `500 Internal Server Error` - Database error or ID collision
 ///
 /// # URL Validation
@@ -65,6 +71,7 @@ use url::Url;
 /// - Must be a valid URL format
 /// - Must include a scheme (http:// or https://)
 /// - Must have a valid hostname
+/// - Must not exceed MAX_URL_LENGTH (2048 characters)
 ///
 /// # Tracing
 ///
@@ -93,6 +100,7 @@ use url::Url;
 /// # Error Handling
 ///
 /// This handler handles the following error cases:
+/// - **URL Too Long** - Returns 422 if URL exceeds MAX_URL_LENGTH
 /// - **Invalid URL Format** - Returns 422 with validation error
 /// - **Database Errors** - Returns 500 with internal error message
 /// - **ID Collision** - Returns 500 with collision error (rare occurrence)
@@ -100,6 +108,7 @@ use url::Url;
 /// # Security Considerations
 ///
 /// - Input validation prevents malicious URL injection
+/// - Length validation prevents resource exhaustion attacks
 /// - Database queries use prepared statements to prevent SQL injection
 /// - API key authentication protects the main endpoint from abuse
 /// - Public endpoint provides limited access for testing
@@ -107,6 +116,7 @@ use url::Url;
 /// # Performance Considerations
 ///
 /// - URL parsing is optimized for common formats
+/// - Length check is O(1) and performed before URL parsing
 /// - Database inserts are performed asynchronously
 /// - ID generation is fast and collision-resistant
 /// - Response format is minimal to reduce bandwidth
@@ -121,6 +131,20 @@ pub async fn post_shorten(
         tracing::error!("Code generation error: {:?}", e);
         ApiError::Internal("Code generation failed".to_string())
     })?;
+
+    // Validate URL length before parsing to prevent resource exhaustion
+    if url.len() > MAX_URL_LENGTH {
+        tracing::warn!(
+            "URL length {} exceeds maximum allowed length of {}",
+            url.len(),
+            MAX_URL_LENGTH
+        );
+        return Err(ApiError::Unprocessable(format!(
+            "URL exceeds maximum allowed length of {} characters",
+            MAX_URL_LENGTH
+        )));
+    }
+
     let p_url = Url::parse(&url).map_err(|e| {
         tracing::error!("Unable to parse URL");
         ApiError::Unprocessable(e.to_string())

@@ -18,10 +18,10 @@ This document provides a comprehensive overview of the URL Shortener application
 ├─────────────────────────────────────────────────┼──────────────────────────┤
 │                         Middleware Layer        │                          │
 │                                                  │                          │
-│                         ┌────────────────────────▼─────────────────────────┐│
-│                         │         API Key Authentication                   ││
-│                         │         (Protected Routes Only)                  ││
-│                         └────────────────────────┬─────────────────────────┘│
+│  ┌────────────────────┐ ┌────────────────────────▼─────────────────────────┐│
+│  │   Rate Limiting    │ │         API Key Authentication                   ││
+│  │  (tower-governor)  │ │         (Protected Routes Only)                  ││
+│  └────────────────────┘ └────────────────────────┬─────────────────────────┘│
 ├──────────────────────────────────────────────────┼──────────────────────────┤
 │                       Application Layer          │                          │
 │                                                   │                          │
@@ -53,6 +53,15 @@ This document provides a comprehensive overview of the URL Shortener application
 │  │  │                 │              │  ┌─────────────────────────────┐│ │  │
 │  │  │ - insert_url()  │              │  │     Connection Pool        ││ │  │
 │  │  │ - get_url()     │              │  │                             ││ │  │
+│  │  │                 │              │  └─────────────────────────────┘│ │  │
+│  │  │                 │              └─────────────────────────────────┘ │  │
+│  │  │                 │                                                   │  │
+│  │  │                 │              ┌─────────────────────────────────┐ │  │
+│  │  │                 │◄─────────────┤    PostgreSQL Implementation   │ │  │
+│  │  │                 │              │                                 │ │  │
+│  │  │                 │              │  ┌─────────────────────────────┐│ │  │
+│  │  │                 │              │  │     Connection Pool        ││ │  │
+│  │  │                 │              │  │                             ││ │  │
 │  │  └─────────────────┘              │  └─────────────────────────────┘│ │  │
 │  │                                   └─────────────────────────────────┘ │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
@@ -62,6 +71,8 @@ This document provides a comprehensive overview of the URL Shortener application
                                    ┌─────────────────┐
                                    │  SQLite File    │
                                    │   database.db   │
+                                   │       OR        │
+                                   │ PostgreSQL DB   │
                                    └─────────────────┘
 ```
 
@@ -111,7 +122,9 @@ pub trait UrlDatabase: Send + Sync {
 - **Flexibility**: Can swap database implementations (PostgreSQL, MySQL, etc.)
 - **Type Safety**: SQLx provides compile-time SQL validation
 
-**Current Implementation**: SQLite with connection pooling and automatic migrations
+**Current Implementations**:
+- **SQLite**: File-based database with connection pooling and automatic migrations
+- **PostgreSQL**: Networked database with connection pooling and dedicated migrations
 
 ### 4. HTTP Layer (`src/lib/routes/`)
 
@@ -128,21 +141,34 @@ RESTful API design with clear separation of concerns:
 #### Route Handlers:
 Each handler follows a consistent pattern:
 1. Extract request data (path params, body, headers)
-2. Validate input
+2. Validate input (URL format, length limits, security checks)
 3. Interact with database layer
 4. Return structured response or error
+
+**Input Validation Features**:
+- **URL Length Validation**: Configurable maximum URL length (default: 2048 characters)
+- **URL Format Validation**: RFC-compliant URL parsing using `url` crate
+- **Security Validation**: Prevents malicious input and resource exhaustion
+- **Early Validation**: Length checks before expensive parsing operations
 
 ### 5. Middleware Stack (`src/lib/middleware.rs`)
 
 **Request Processing Pipeline**:
 ```
-Request → Request ID → Tracing → API Key Auth → Handler → Response
+Request → Request ID → Tracing → Rate Limiting → API Key Auth → Handler → Response
 ```
 
 - **Request ID Generation**: UUID-based correlation IDs
 - **Distributed Tracing**: Request lifecycle tracking
+- **Rate Limiting**: Per-IP rate limiting using GCRA algorithm (tower-governor)
 - **API Key Authentication**: Protects sensitive endpoints
 - **Error Handling**: Converts errors to HTTP responses
+
+**Rate Limiting Features**:
+- **Per-IP Enforcement**: Individual rate limits for each client IP
+- **GCRA Algorithm**: Generic Cell Rate Algorithm for smooth rate limiting
+- **Configurable**: Requests per second and burst size configurable
+- **Selective**: Only applies to URL shortening endpoints, not redirects/health checks
 
 ### 6. Application State (`src/lib/state.rs`)
 
@@ -211,11 +237,13 @@ pub enum ApiError {
 ### URL Shortening Flow
 ```
 1. POST /api/shorten with URL in body
-2. API Key middleware validates x-api-key header
-3. Handler parses and validates URL
-4. Generate unique 6-character ID (nanoid)
-5. Store mapping in database
-6. Return shortened URL: https://host/{id}
+2. Rate limiting middleware checks IP-based limits
+3. API Key middleware validates x-api-key header
+4. Handler validates URL length (max 2048 characters)
+5. Handler parses and validates URL format
+6. Generate unique 6-character ID (nanoid)
+7. Store mapping in database
+8. Return shortened URL: https://host/{id}
 ```
 
 ### URL Redirect Flow
@@ -240,18 +268,43 @@ pub enum ApiError {
 
 ### Database Schema
 
+**Core URLs Table**:
 ```sql
 CREATE TABLE urls (
-    id TEXT PRIMARY KEY,    -- 6-character nanoid
-    url TEXT NOT NULL       -- Original URL
+    id TEXT PRIMARY KEY,         -- 6-character nanoid
+    url TEXT NOT NULL,           -- Original URL
+    owner_id TEXT NULL           -- FK to users.id (optional)
+);
+```
+
+**User Management Tables**:
+```sql
+CREATE TABLE users (
+    id TEXT PRIMARY KEY,                    -- UUID for portability
+    email TEXT NOT NULL UNIQUE,            -- User email address
+    password_hash TEXT NOT NULL,           -- Secure password hash
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE sessions (
+    id TEXT PRIMARY KEY,                    -- Session UUID
+    user_id TEXT NOT NULL,                 -- FK to users.id
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,          -- Session expiry
+    last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    user_agent TEXT,                       -- Optional metadata
+    ip_address TEXT,                       -- Optional metadata
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 ```
 
 **Design Decisions**:
-- **Simple Schema**: Minimal viable product approach
-- **Text IDs**: Human-readable, URL-safe identifiers
-- **No Timestamps**: Keep it simple (can be added later)
-- **No User Association**: Anonymous URL shortening
+- **Text IDs**: Human-readable, URL-safe identifiers across all tables
+- **Optional User Association**: URLs can be anonymous or user-owned
+- **Session Management**: Foundation for user authentication system
+- **Backward Compatibility**: Existing anonymous URLs remain functional
+- **Performance Indexes**: Strategic indexes for common lookup patterns
 
 ## 🏗️ Architectural Patterns
 
@@ -281,10 +334,12 @@ CREATE TABLE urls (
 ### Integration Tests (`tests/api/`)
 
 **Test Strategy**:
-- **In-Memory Database**: SQLite `:memory:` for isolation
+- **In-Memory Database**: SQLite `:memory:` for fast, isolated tests
+- **PostgreSQL Integration**: Optional tests against real PostgreSQL instances
 - **Full Application**: Tests complete request/response cycle
-- **Helper Functions**: Shared test utilities
+- **Helper Functions**: Shared test utilities and setup
 - **Tracing Integration**: Optional logging for debugging
+- **Multi-Database**: Tests run against multiple database backends
 
 **Test Structure**:
 ```
@@ -327,15 +382,22 @@ pub struct TestApp {
 ## 🔮 Extension Points
 
 ### Database Support
-The trait-based database abstraction makes it easy to add support for other databases:
+The trait-based database abstraction currently supports multiple databases:
 
+**Implemented**:
+- **SQLite**: `SqliteUrlDatabase` in `src/database/sqlite.rs`
+- **PostgreSQL**: `PostgresUrlDatabase` in `src/database/postgres_sql.rs`
+
+**Adding New Databases**:
 ```rust
-pub struct PostgresUrlDatabase { /* ... */ }
+pub struct MySqlUrlDatabase { /* ... */ }
 
-impl UrlDatabase for PostgresUrlDatabase {
-    // Implement trait methods for PostgreSQL
+impl UrlDatabase for MySqlUrlDatabase {
+    // Implement trait methods for MySQL
 }
 ```
+
+**Database Selection**: Configured through environment settings, enabling easy switching between database backends.
 
 ### Authentication
 Current API key middleware can be extended for:
@@ -358,6 +420,35 @@ Add caching layer between handlers and database:
 - In-memory cache for single instance
 - Cache invalidation strategies
 
+## 🛠️ Development Environment
+
+### Nix Flake Integration
+
+The project includes a comprehensive Nix development environment (`flake.nix`):
+
+**Features**:
+- **Reproducible Environment**: Consistent development setup across all platforms
+- **Rust Toolchain**: Fenix-provided stable Rust with required components
+- **Dependencies**: Pre-installed SQLx CLI, SQLite, and development tools
+- **LLVM Integration**: Clang/LLD for optimized linking
+- **Pre-commit Hooks**: Optional formatting and linting checks
+
+**Usage**:
+```bash
+# Enter development environment
+nix develop
+
+# Automatic environment with direnv
+echo "use flake" > .envrc
+direnv allow
+```
+
+**Benefits**:
+- **Zero Setup**: No manual dependency installation
+- **Version Consistency**: Locked dependency versions across team
+- **CI/CD Integration**: Same environment used in continuous integration
+- **Cross-Platform**: Works on Linux, macOS, and Windows (WSL)
+
 ## 📝 Development Guidelines
 
 ### Adding New Endpoints
@@ -367,10 +458,11 @@ Add caching layer between handlers and database:
 4. Update API documentation
 
 ### Database Changes
-1. Create migration files in `migrations/`
-2. Update database trait if needed
-3. Update SQLite implementation
-4. Test migration up/down
+1. Create migration files in `migrations/` (SQLite) and `migrations/pg/` (PostgreSQL)
+2. Update database trait if needed (`src/database/mod.rs`)
+3. Update implementations (`src/database/sqlite.rs` and `src/database/postgres_sql.rs`)
+4. Test migrations on both database backends
+5. Update configuration examples for new settings
 
 ### Configuration Changes
 1. Update `Settings` structs in `configuration.rs`

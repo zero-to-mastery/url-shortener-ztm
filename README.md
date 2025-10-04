@@ -7,23 +7,26 @@ A high-performance URL shortener service built with modern Rust technologies. Th
 - **Fast URL shortening**: Generate short, unique identifiers for long URLs using nanoid
 - **Reliable redirects**: Permanent redirects to original URLs with proper HTTP status codes
 - **Rate limiting**: Built-in rate limiting to prevent abuse using tower-governor
-- **SQLite storage**: Lightweight, file-based database with automatic migrations
+- **Multi-database support**: SQLite and PostgreSQL database backends
 - **Database abstraction**: Trait-based database layer for easy database switching
+- **URL validation**: Input validation with configurable URL length limits (2048 characters)
 - **Comprehensive logging**: Structured logging with tracing and request IDs
 - **Health monitoring**: Built-in health check endpoint
 - **Web interface**: Admin panel with Tera templates
 - **API key protection**: Secure API endpoints with UUID-based authentication
+- **Nix development environment**: Flake-based dev environment with pre-commit hooks
 - **Production ready**: Built for deployment with graceful shutdown handling
 
 ## 🛠 Technology Stack
 
 - **Framework**: [Axum](https://github.com/tokio-rs/axum) - Modern async web framework
-- **Database**: SQLite with [SQLx](https://github.com/launchbadge/sqlx) for type-safe queries
+- **Databases**: SQLite and PostgreSQL with [SQLx](https://github.com/launchbadge/sqlx) for type-safe queries
 - **Rate Limiting**: [tower-governor](https://crates.io/crates/tower_governor) - Per-IP rate limiting with GCRA algorithm
 - **Templates**: [Tera](https://keats.github.io/tera/) - Template engine for web interface
 - **Configuration**: [Figment](https://github.com/SergioBenitez/figment) - Layered configuration
 - **Logging**: Structured logging with `tracing` and Bunyan formatting
-- **Testing**: Comprehensive integration tests with in-memory SQLite databases
+- **Development**: Nix flake with Fenix Rust toolchain and pre-commit hooks
+- **Testing**: Comprehensive integration tests with in-memory databases
 
 ## 📡 API Endpoints
 
@@ -88,9 +91,12 @@ curl http://localhost:8000/admin
 ### Prerequisites
 - [Rust](https://rustup.rs/) (latest stable)
 - [SQLx CLI](https://crates.io/crates/sqlx-cli)
-- No external database required (uses SQLite)
+- Database: SQLite (no setup required) or PostgreSQL (optional)
+- [Nix](https://nixos.org/download.html) (optional, for Nix development environment)
 
 ### Local Development
+
+#### Option 1: Traditional Rust Development
 
 1. **Clone the repository**
    ```bash
@@ -103,19 +109,39 @@ curl http://localhost:8000/admin
    cargo build
    ```
 
-3. ** Create the Database**
-  ```bash
-  sqlx database create
-  ```
+3. **Create the Database**
+   ```bash
+   sqlx database create
+   ```
 
 4. **Run the application**
    ```bash
    cargo run
    ```
-   
+
    The database and migrations will be set up automatically on first run.
 
-5. **Test the service**
+#### Option 2: Nix Development Environment
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/url-shortener-ztm.git
+   cd url-shortener-ztm
+   ```
+
+2. **Enter the Nix development environment**
+   ```bash
+   nix develop
+   ```
+
+   This provides a complete development environment with Rust toolchain, SQLx CLI, and all dependencies.
+
+3. **Run the application**
+   ```bash
+   cargo run
+   ```
+
+4. **Test the service**
    ```bash
    # Get your API key from configuration/base.yaml (or set via environment)
    API_KEY="e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5"
@@ -155,13 +181,26 @@ APP_DATABASE__DATABASE_PATH=./my-database.db
 ```
 
 #### Database Configuration
+
+**SQLite Configuration (Default)**
 ```yaml
 database:
   database_path: "sqlite:database.db"  # Path to SQLite database file
   create_if_missing: true              # Create database if it doesn't exist
 ```
 
-For in-memory database (testing):
+**PostgreSQL Configuration**
+```yaml
+database:
+  host: "localhost"
+  port: 5432
+  username: "app"
+  password: "secret"
+  database_name: "urlshortener"
+  create_if_missing: true
+```
+
+**For in-memory database (testing):**
 ```yaml
 database:
   database_path: ":memory:"
@@ -214,7 +253,7 @@ APP_RATE_LIMITING__BURST_SIZE=20                 # Allow bursts of 20 requests
 
 ## 🧪 Testing
 
-The project includes comprehensive integration tests using in-memory SQLite databases.
+The project includes comprehensive integration tests using in-memory databases.
 
 ```bash
 # Run all tests
@@ -227,14 +266,19 @@ TEST_LOG=1 cargo test
 cargo test health_check
 cargo test redirect
 cargo test shorten
+
+# Run PostgreSQL tests (requires running PostgreSQL)
+cargo test postgres_database_insert_get -- --ignored
 ```
 
 ### Test Coverage
 - ✅ Health check endpoint with JSON envelope validation
 - ✅ URL shortening functionality with API key authentication
 - ✅ URL redirection with proper HTTP status codes
+- ✅ URL length validation (2048 character limit)
 - ✅ Rate limiting with per-IP enforcement and proper HTTP headers
-- ✅ Database integration with trait abstraction
+- ✅ SQLite database integration with trait abstraction
+- ✅ PostgreSQL database integration (optional)
 - ✅ Error handling and edge cases
 
 ## 🏗 Project Structure
@@ -255,7 +299,8 @@ src/
     ├── templates.rs               # Template rendering
     ├── database/
     │   ├── mod.rs                 # Database trait definitions
-    │   └── sqlite.rs              # SQLite implementation
+    │   ├── sqlite.rs              # SQLite implementation
+    │   └── postgres_sql.rs        # PostgreSQL implementation
     └── routes/
         ├── mod.rs                 # Route module exports
         ├── health_check.rs        # Health check handler
@@ -277,8 +322,15 @@ configuration/
 └── production.yaml                # Production config
 
 migrations/
-├── 20250917043645_url_shortener_ztm.up.sql    # Database schema
-└── 20250917043645_url_shortener_ztm.down.sql  # Rollback migration
+├── 20250917043645_url_shortener_ztm.up.sql           # SQLite schema
+├── 20250917043645_url_shortener_ztm.down.sql         # SQLite rollback
+├── 20251002000100_add_users_and_sessions.up.sql     # SQLite users/sessions
+├── 20251002000100_add_users_and_sessions.down.sql   # SQLite users/sessions rollback
+└── pg/                                                # PostgreSQL migrations
+    ├── 20251003014824_url_shortener_ztm_pg.up.sql   # PostgreSQL schema
+    ├── 20251003014824_url_shortener_ztm_pg.down.sql # PostgreSQL rollback
+    ├── 20251003014854_init_urls_users_sessions_pg.up.sql   # PostgreSQL users/sessions
+    └── 20251003014854_init_urls_users_sessions_pg.down.sql # PostgreSQL users/sessions rollback
 
 static/                            # Static web assets
 ├── screen.css                     # CSS styles
@@ -287,12 +339,15 @@ static/                            # Static web assets
 templates/                         # Tera templates
 ├── base.html                      # Base template
 └── index.html                     # Admin interface
+
+flake.nix                          # Nix development environment
+└── flake.lock                     # Nix lock file
 ```
 
 ## 🔧 Architecture
 
 ### Database Layer
-The application uses a trait-based database abstraction (`UrlDatabase`) that currently supports SQLite but can be easily extended to other databases:
+The application uses a trait-based database abstraction (`UrlDatabase`) that supports both SQLite and PostgreSQL:
 
 ```rust
 #[async_trait]
@@ -338,9 +393,10 @@ CREATE TABLE urls (
 ## 🔒 Security
 
 - **API Key Authentication**: Protected endpoints require valid UUID-based API keys
-- **Input Validation**: URL parsing and validation before storage
+- **Input Validation**: URL parsing and length validation before storage
 - **SQL Injection Protection**: Type-safe queries with SQLx
 - **Error Information Disclosure**: Sanitized error responses
+- **Resource Protection**: URL length limits prevent resource exhaustion attacks
 
 ## 🚧 Roadmap
 
@@ -351,12 +407,15 @@ CREATE TABLE urls (
 - [x] Comprehensive error handling
 - [x] Integration tests
 - [x] PostgreSQL database support
+- [x] Rate limiting with tower-governor
+- [x] URL length validation (2048 characters)
+- [x] Nix development environment with flake
 - [ ] User authentication and URL management
 - [ ] Analytics and usage statistics
 - [ ] Custom short URL aliases
 - [ ] URL expiration and cleanup
-- [ ] Rate limiting
 - [ ] Docker containerization
+- [ ] Real-world API specification compliance
 
 ## 🤝 Contributing
 
