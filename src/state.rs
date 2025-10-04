@@ -32,6 +32,7 @@
 
 use crate::configuration::Settings;
 use crate::database::UrlDatabase;
+use crate::generator::ShortCodeGenerator;
 use axum_macros::FromRef;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -82,6 +83,9 @@ use uuid::Uuid;
 pub struct AppState {
     /// Database connection for URL storage and retrieval operations
     pub database: Arc<dyn UrlDatabase>,
+
+    pub code_generator: Arc<dyn ShortCodeGenerator>,
+
     /// UUID-based API key for authenticating protected endpoints
     pub api_key: Uuid,
     /// Directory path containing Tera template files for web interface
@@ -133,6 +137,7 @@ impl AppState {
     /// ```
     pub fn new(
         database: Arc<dyn UrlDatabase>,
+        code_generator: Arc<dyn ShortCodeGenerator>,
         api_key: Uuid,
         template_dir: String,
         config: Settings,
@@ -142,6 +147,7 @@ impl AppState {
             api_key,
             template_dir,
             config,
+            code_generator,
         }
     }
 }

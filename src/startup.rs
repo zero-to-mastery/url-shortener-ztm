@@ -51,6 +51,7 @@ use crate::DatabaseType;
 use crate::configuration::Settings;
 use crate::database::postgres_sql::PostgresUrlDatabase;
 use crate::database::{SqliteUrlDatabase, UrlDatabase};
+use crate::generator::build_generator;
 use crate::middleware::check_api_key;
 use crate::routes::{
     get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
@@ -228,6 +229,7 @@ impl Application {
                 Arc::new(db) as Arc<dyn UrlDatabase>
             }
         };
+        let code_generator = build_generator(&config.shortener);
 
         // Set up the TCP listener and application state
         let api_key = config.application.api_key;
@@ -237,7 +239,7 @@ impl Application {
             .await
             .context("Unable to obtain a TCP listener...")?;
         let port = listener.local_addr()?.port();
-        let state = AppState::new(database, api_key, template_dir, config);
+        let state = AppState::new(database, code_generator, api_key, template_dir, config);
 
         // Build the application router, passing in the application state
         let router = build_router(state.clone())
