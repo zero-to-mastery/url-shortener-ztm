@@ -14,7 +14,7 @@ use tracing::instrument;
 use url::Url;
 
 /// Maximum allowed URL length in characters.
-/// 
+///
 /// RFC 2616 doesn't specify a limit, but most browsers support 2000+ characters.
 /// We use 2048 as a reasonable limit to prevent abuse while supporting legitimate URLs.
 const MAX_URL_LENGTH: usize = 2048;
@@ -128,7 +128,7 @@ pub async fn post_shorten(
     url: String,
 ) -> Result<impl IntoResponse, ApiError> {
     let id = &nanoid::nanoid!(6);
-    
+
     // Validate URL length before parsing to prevent resource exhaustion
     if url.len() > MAX_URL_LENGTH {
         tracing::warn!(
@@ -141,7 +141,7 @@ pub async fn post_shorten(
             MAX_URL_LENGTH
         )));
     }
-    
+
     let p_url = Url::parse(&url).map_err(|e| {
         tracing::error!("Unable to parse URL");
         ApiError::Unprocessable(e.to_string())

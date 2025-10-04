@@ -30,13 +30,13 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
 }
 
 /// Helper function to generate a URL of a specific total length.
-/// 
+///
 /// Creates a URL with the pattern "https://example.com/<padding>"
 /// where <padding> is repeated 'a' characters to reach the desired length.
-/// 
+///
 /// # Arguments
 /// * `total_len` - The desired total length of the URL in characters
-/// 
+///
 /// # Returns
 /// A URL string of exactly `total_len` characters
 fn make_url_with_total_len(total_len: usize) -> String {
@@ -57,9 +57,13 @@ async fn shorten_accepts_url_at_exact_max_length() {
     // Arrange
     let app = spawn_app().await;
     let url = make_url_with_total_len(2048);
-    
+
     // Verify our helper created the right length
-    assert_eq!(url.len(), 2048, "Test URL should be exactly 2048 characters");
+    assert_eq!(
+        url.len(),
+        2048,
+        "Test URL should be exactly 2048 characters"
+    );
 
     // Act
     let response = app.post_api_with_key("/api/shorten", &url).await;
@@ -70,7 +74,7 @@ async fn shorten_accepts_url_at_exact_max_length() {
         StatusCode::OK,
         "Expected 200 OK for URL at maximum allowed length"
     );
-    
+
     // Verify we got a shortened URL back
     let body = response.text().await.expect("Failed to read response body");
     assert!(
@@ -85,9 +89,13 @@ async fn shorten_rejects_url_exceeding_max_length() {
     // Arrange
     let app = spawn_app().await;
     let url = make_url_with_total_len(2049);
-    
+
     // Verify our helper created the right length
-    assert_eq!(url.len(), 2049, "Test URL should be exactly 2049 characters");
+    assert_eq!(
+        url.len(),
+        2049,
+        "Test URL should be exactly 2049 characters"
+    );
 
     // Act
     let response = app.post_api_with_key("/api/shorten", &url).await;
@@ -98,7 +106,7 @@ async fn shorten_rejects_url_exceeding_max_length() {
         StatusCode::UNPROCESSABLE_ENTITY,
         "Expected 422 Unprocessable Entity for URL exceeding maximum length"
     );
-    
+
     // Verify the error message is informative
     let body = response.text().await.expect("Failed to read response body");
     assert!(
@@ -115,8 +123,12 @@ async fn shorten_rejects_very_long_url() {
     let app = spawn_app().await;
     // Test with a URL that's way over the limit
     let url = make_url_with_total_len(5000);
-    
-    assert_eq!(url.len(), 5000, "Test URL should be exactly 5000 characters");
+
+    assert_eq!(
+        url.len(),
+        5000,
+        "Test URL should be exactly 5000 characters"
+    );
 
     // Act
     let response = app.post_api_with_key("/api/shorten", &url).await;
