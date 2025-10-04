@@ -20,8 +20,12 @@ Before contributing, make sure you have:
 - [SQLx CLI](https://crates.io/crates/sqlx-cli) for database operations
 - Git for version control
 - A text editor or IDE (VS Code with rust-analyzer recommended)
+- **Optional**: [Nix](https://nixos.org/download.html) for reproducible development environment
+- **Optional**: PostgreSQL (if working on PostgreSQL-specific features)
 
 ### Setting Up Your Development Environment
+
+#### Option 1: Traditional Rust Setup
 
 1. **Fork and clone the repository**
    ```bash
@@ -43,13 +47,56 @@ Before contributing, make sure you have:
    ```bash
    cargo run
    ```
-   
+
    The application will be available at `http://localhost:8000`
 
 5. **Run tests to ensure everything works**
    ```bash
    cargo test
    ```
+
+#### Option 2: Nix Development Environment (Recommended)
+
+For a consistent, reproducible development environment:
+
+1. **Fork and clone the repository**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/url-shortener-ztm.git
+   cd url-shortener-ztm
+   ```
+
+2. **Enter the Nix development environment**
+   ```bash
+   nix develop
+   ```
+
+   This automatically provides:
+   - Rust toolchain with required components
+   - SQLx CLI and SQLite
+   - Development tools and dependencies
+   - Consistent environment across all platforms
+
+3. **Run the application**
+   ```bash
+   cargo run
+   ```
+
+4. **Run tests**
+   ```bash
+   cargo test
+   ```
+
+#### Option 3: Using direnv (Automatic Environment)
+
+For automatic environment activation:
+
+1. **Install direnv** (if not already installed)
+2. **Create .envrc file**
+   ```bash
+   echo "use flake" > .envrc
+   direnv allow
+   ```
+3. **Environment loads automatically** when you `cd` into the project
 
 ## 🤝 How to Contribute
 
@@ -58,11 +105,15 @@ Before contributing, make sure you have:
 - 🐛 **Bug fixes** - Fix issues in the codebase
 - ✨ **New features** - Add functionality to the URL shortener
 - 📚 **Documentation** - Improve README, code comments, or create tutorials
-- 🧪 **Tests** - Add or improve test coverage
+- 🧪 **Tests** - Add or improve test coverage (SQLite and PostgreSQL)
 - 🎨 **UI/UX improvements** - Enhance the web interface
 - ⚡ **Performance optimizations** - Make the service faster or more efficient
-- 🔒 **Security enhancements** - Improve the security of the application
+- 🔒 **Security enhancements** - Improve security, rate limiting, input validation
 - 🏗️ **Refactoring** - Improve code structure and maintainability
+- 🗄️ **Database improvements** - Enhance SQLite/PostgreSQL implementations
+- 🔧 **Development environment** - Improve Nix flake or development tooling
+- 📊 **Rate limiting** - Enhance or customize rate limiting features
+- ✅ **Input validation** - Improve URL validation and security checks
 
 ### Finding Issues to Work On
 
@@ -89,7 +140,7 @@ Before contributing, make sure you have:
 #### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (uses in-memory SQLite by default)
 cargo test
 
 # Run tests with logging output (useful for debugging)
@@ -99,15 +150,49 @@ TEST_LOG=1 cargo test
 cargo test health_check
 cargo test shorten
 cargo test redirect
+
+# Run PostgreSQL integration tests (requires running PostgreSQL)
+cargo test postgres_database_insert_get -- --ignored
+
+# Run tests with specific database configuration
+DATABASE_URL="sqlite::memory:" cargo test
 ```
+
+#### Testing Multiple Database Backends
+
+The project supports both SQLite and PostgreSQL. When contributing:
+
+- **SQLite tests** run automatically (in-memory database)
+- **PostgreSQL tests** are marked with `#[ignore]` and require a running PostgreSQL instance
+- Test your changes against both backends when working on database-related features
+- Use the test helpers in `tests/api/helpers.rs` for consistent test setup
 
 ### Database Changes
 
 If your contribution involves database changes:
 
-1. Create a new migration file in the `migrations/` directory
-2. Follow the existing naming convention: `YYYYMMDDHHMMSS_description.up.sql` and `.down.sql`
+#### SQLite Migrations
+1. Create migration files in the `migrations/` directory
+2. Follow the naming convention: `YYYYMMDDHHMMSS_description.up.sql` and `.down.sql`
 3. Test your migration with `sqlx migrate run` and `sqlx migrate revert`
+
+#### PostgreSQL Migrations
+1. Create migration files in the `migrations/pg/` directory
+2. Use the same naming convention as SQLite migrations
+3. Test migrations against a running PostgreSQL instance
+4. Ensure both SQLite and PostgreSQL migrations achieve the same schema result
+
+#### Database Implementation Changes
+- Update the `UrlDatabase` trait in `src/database/mod.rs` if adding new methods
+- Implement changes in both `src/database/sqlite.rs` and `src/database/postgres_sql.rs`
+- Add appropriate error handling for database-specific constraints
+- Test implementations with both database backends
+
+#### Migration Best Practices
+- **Backward Compatibility**: Ensure migrations don't break existing data
+- **Rollback Safety**: Always test the `.down.sql` migration
+- **Data Preservation**: Use appropriate constraints and indexes
+- **Documentation**: Comment complex migrations explaining their purpose
 
 ### Configuration Changes
 
@@ -139,9 +224,20 @@ If your contribution involves database changes:
 
 4. **Test your changes**
    ```bash
+   # Run all tests
    cargo test
+
+   # Check for linting issues
    cargo clippy
+
+   # Verify code formatting
    cargo fmt --check
+
+   # Test PostgreSQL features (if applicable)
+   cargo test postgres_database_insert_get -- --ignored
+
+   # Test rate limiting (if contributing to rate limiting features)
+   cargo test rate_limiting
    ```
 
 5. **Commit your changes**
@@ -203,16 +299,31 @@ src/
 └── lib/
     ├── lib.rs               # Library root
     ├── configuration.rs     # Config management
-    ├── database/            # Database layer
+    ├── database/
+    │   ├── mod.rs           # Database trait definitions
+    │   ├── sqlite.rs        # SQLite implementation
+    │   └── postgres_sql.rs  # PostgreSQL implementation
     ├── routes/              # HTTP route handlers
+    │   ├── health_check.rs  # Health check endpoint
+    │   ├── shorten.rs       # URL shortening (with validation)
+    │   ├── redirect.rs      # URL redirection
+    │   └── index.rs         # Admin interface
+    ├── middleware.rs        # Rate limiting & auth middleware
     ├── startup.rs           # Application startup
     └── ...
 
 tests/api/                   # Integration tests
 configuration/               # YAML config files
-migrations/                  # Database migrations
-templates/                   # HTML templates
+├── base.yml                # Base configuration
+├── local.yml               # Local development
+└── production.yaml         # Production settings
+
+migrations/                  # SQLite database migrations
+└── pg/                     # PostgreSQL database migrations
+
+templates/                   # HTML templates (Tera)
 static/                      # CSS/JS assets
+flake.nix                   # Nix development environment
 ```
 
 ## 📋 Issue Labels
@@ -223,6 +334,12 @@ static/                      # CSS/JS assets
 - `bug` - Something isn't working
 - `enhancement` - New feature or request
 - `documentation` - Documentation improvements needed
+- `database` - Database-related (SQLite/PostgreSQL)
+- `rate-limiting` - Rate limiting functionality
+- `security` - Security and input validation
+- `nix` - Nix development environment
+- `testing` - Test improvements or additions
+- `performance` - Performance optimizations
 - `question` - Further information is requested
 
 ## 🐛 Reporting Bugs
@@ -259,16 +376,54 @@ For feature requests:
 - Help others learn and grow
 - Follow GitHub's community guidelines
 
+## 🔧 Special Contribution Areas
+
+### Database Backend Development
+The project supports multiple database backends. Areas for contribution:
+
+- **PostgreSQL Enhancements**: Connection pooling, advanced indexing, performance tuning
+- **Database Abstraction**: New database implementations (MySQL, Redis, etc.)
+- **Migration Tools**: Database switching utilities, data migration scripts
+- **Testing**: Cross-database compatibility tests, performance benchmarks
+
+### Rate Limiting and Security
+Current rate limiting can be extended:
+
+- **Advanced Algorithms**: Token bucket, sliding window implementations
+- **Configuration**: Per-endpoint limits, user-based limits, IP whitelisting
+- **Monitoring**: Rate limit metrics, abuse detection, alerting
+- **Security**: DDoS protection, bot detection, CAPTCHA integration
+
+### Input Validation and Security
+URL validation and security features:
+
+- **URL Validation**: Custom validation rules, domain blocking, content filtering
+- **Security Scanning**: Malware detection, phishing protection
+- **Input Sanitization**: Enhanced XSS protection, injection prevention
+- **Audit Logging**: Security event tracking, compliance features
+
+### Development Environment
+Nix and development tooling improvements:
+
+- **CI/CD**: GitHub Actions workflows, automated testing, deployment
+- **Development Tools**: IDE integration, debugging tools, profiling
+- **Documentation**: Setup guides, troubleshooting, best practices
+- **Cross-Platform**: Windows support, Docker integration
+
 ## 🎯 Contribution Goals
 
 We're especially interested in contributions that:
 
-- Improve performance and scalability
-- Add useful features for URL management
-- Enhance security and reliability
-- Improve user experience
-- Add comprehensive tests
-- Improve documentation and examples
+- **Performance and Scalability**: Database optimizations, caching, load testing
+- **URL Management**: User authentication, custom aliases, analytics, expiration
+- **Security and Reliability**: Input validation improvements, rate limiting enhancements
+- **Database Features**: PostgreSQL optimizations, connection pooling, migration tools
+- **User Experience**: Admin interface improvements, API enhancements
+- **Testing**: Multi-database test coverage, performance tests, security tests
+- **Development Environment**: Nix flake improvements, CI/CD enhancements
+- **Documentation**: API documentation, deployment guides, architecture explanations
+- **Rate Limiting**: Customizable limits, IP whitelisting, advanced algorithms
+- **Input Validation**: URL parsing improvements, security hardening
 
 ## 🏆 Recognition
 
