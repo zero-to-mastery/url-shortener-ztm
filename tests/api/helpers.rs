@@ -147,19 +147,20 @@ impl TestApp {
     }
 
     // Authenticated POST with API key header
-    pub async fn post_api_with_key(
-        &self,
-        path: &str,
-        body: impl Into<String>,
-    ) -> reqwest::Response {
-        self.client
-            .post(self.api(path))
-            .header("x-api-key", self.api_key.to_string())
-            .body(body.into())
-            .send()
-            .await
-            .expect("Failed to execute POST request")
-    }
+     pub async fn post_api_with_key(
+    &self,
+    path: &str,
+    body: impl Into<String>,
+) -> reqwest::Response {
+    self.client
+        .post(self.api(path))
+        .header("x-api-key", self.api_key.to_string())
+        .header("host", "localhost:8000")  // ← Add this line
+        .body(body.into())
+        .send()
+        .await
+        .expect("Failed to execute POST request")
+}
 
     // Admin route helpers
     pub async fn get_admin_dashboard(&self) -> reqwest::Response {
