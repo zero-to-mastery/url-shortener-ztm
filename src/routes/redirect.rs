@@ -80,6 +80,20 @@ pub async fn get_redirect(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
+    // Validate against configured length and alphabet before DB lookup
+    // check length (use char count to be safe)
+    if id.chars().count() != state.config.shortener.length {
+        tracing::warn!("rejecting redirect: invalid id length");
+        return Err(ApiError::NotFound("URL not found".to_string()));
+    }
+
+    // Use precomputed allowed_chars from AppState
+    if id.chars().any(|c| !state.allowed_chars.contains(&c)) {
+        tracing::warn!("rejecting redirect: id contains invalid characters");
+        return Err(ApiError::NotFound("URL not found".to_string()));
+    }
+
+    // Proceed with DB lookup
     match state.database.get_url(&id).await {
         Ok(url) => {
             tracing::info!("shortened URL retrieved, redirecting...");

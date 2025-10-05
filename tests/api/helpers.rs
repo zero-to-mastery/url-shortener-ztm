@@ -4,9 +4,10 @@
 use axum::http::StatusCode;
 use reqwest::header::CONTENT_TYPE;
 use serde_json::Value;
+use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
 use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
-use url_shortener_ztm_lib::generator::build_generator;
+use url_shortener_ztm_lib::generator::{self, build_generator};
 use url_shortener_ztm_lib::get_configuration;
 use url_shortener_ztm_lib::startup::build_router;
 use url_shortener_ztm_lib::state::AppState;
@@ -59,12 +60,24 @@ pub async fn spawn_app() -> TestApp {
     let database = Arc::new(sqlite_db);
     let code_generator = build_generator(&configuration.shortener);
 
+    let allowed_chars: HashSet<char> = {
+        let mut set: HashSet<char> = HashSet::new();
+        if let Some(alpha) = &configuration.shortener.alphabet {
+            set.extend(alpha.chars());
+        } else {
+            set.extend(generator::DEFAULT_ALPHABET);
+        }
+
+        set
+    };
+
     // Store the API key for use in tests
     let api_key = configuration.application.api_key;
 
     let test_app_state = AppState::new(
         database.clone(),
         code_generator,
+        allowed_chars,
         api_key,
         configuration.application.templates.clone(),
         configuration.clone(),
