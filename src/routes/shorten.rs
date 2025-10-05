@@ -6,10 +6,12 @@
 
 use crate::database::DatabaseError;
 use crate::errors::ApiError;
+use crate::response::ApiResponse;
 use crate::state::AppState;
-use axum::{extract::State, http::StatusCode, response::IntoResponse};
+use axum::extract::State;
 use axum_extra::{TypedHeader, headers::Host};
 use axum_macros::debug_handler;
+use serde::Serialize;
 use tracing::instrument;
 use url::Url;
 
@@ -18,6 +20,16 @@ use url::Url;
 /// RFC 2616 doesn't specify a limit, but most browsers support 2000+ characters.
 /// We use 2048 as a reasonable limit to prevent abuse while supporting legitimate URLs.
 const MAX_URL_LENGTH: usize = 2048;
+
+#[derive(Debug, Serialize)]
+pub struct ShortenResponse {
+    /// The shortened URL
+    pub shortened_url: String,
+    /// The original URL that was shortened
+    pub original_url: String,
+    /// The unique identifier used in the shortened URL
+    pub id: String,
+}
 
 /// URL shortening handler that creates short URLs from long URLs.
 ///
@@ -46,10 +58,20 @@ const MAX_URL_LENGTH: usize = 2048;
 ///
 /// # Response Format
 ///
-/// Returns the shortened URL as plain text:
+/// Returns a JSON response with the shortened URL information:
 ///
-/// ```text
-/// https://localhost:8000/AbC123
+/// ```json
+/// {
+///   "success": true,
+///   "message": "ok",
+///   "status": 200,
+///   "time": "2025-01-18T12:00:00Z",
+///   "data": {
+///     "shortened_url": "https://localhost:8000/AbC123",
+///     "original_url": "https://www.example.com/very/long/url",
+///     "id": "AbC123"
+///   }
+/// }
 /// ```
 ///
 /// # URL Generation
@@ -93,8 +115,18 @@ const MAX_URL_LENGTH: usize = 2048;
 /// curl -d 'https://www.example.com' \
 ///   http://localhost:8000/api/public/shorten
 ///
-/// # Expected response
-/// https://localhost:8000/AbC123
+/// # Expected response (JSON)
+/// {
+///   "success": true,
+///   "message": "ok",
+///   "status": 200,
+///   "time": "2025-01-18T12:00:00Z",
+///   "data": {
+///     "shortened_url": "https://localhost:8000/AbC123",
+///     "original_url": "https://www.example.com",
+///     "id": "AbC123"
+///   }
+/// }
 /// ```
 ///
 /// # Error Handling
@@ -119,14 +151,14 @@ const MAX_URL_LENGTH: usize = 2048;
 /// - Length check is O(1) and performed before URL parsing
 /// - Database inserts are performed asynchronously
 /// - ID generation is fast and collision-resistant
-/// - Response format is minimal to reduce bandwidth
+/// - Response format follows consistent JSON schema for better frontend integration
 #[debug_handler]
 #[instrument(name = "shorten" skip(state))]
 pub async fn post_shorten(
     State(state): State<AppState>,
     TypedHeader(header): TypedHeader<Host>,
     url: String,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<ApiResponse<ShortenResponse>, ApiError> {
     let id = state.code_generator.generate().map_err(|e| {
         tracing::error!("Code generation error: {:?}", e);
         ApiError::Internal("Code generation failed".to_string())
@@ -153,9 +185,14 @@ pub async fn post_shorten(
 
     match state.database.insert_url(id.as_ref(), p_url.as_str()).await {
         Ok(()) => {
-            let response_body = format!("https://{}/{}\n", host, id);
+            let shortened_url = format!("https://{}/{}", host, id);
+            let response_data = ShortenResponse {
+                shortened_url,
+                original_url: url.clone(),
+                id: id.to_string(),
+            };
             tracing::info!("URL shortened and saved successfully...");
-            Ok((StatusCode::OK, response_body).into_response())
+            Ok(ApiResponse::success(response_data))
         }
         Err(DatabaseError::Duplicate) => {
             tracing::error!("Duplicate ID generated");
