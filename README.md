@@ -154,7 +154,7 @@ curl http://localhost:8000/admin
 2. **Enter the Nix development environment**
 
    ```bash
-   nix develop
+   nix develop --accept-flake-config # --accept-flake-config is needed to accept the nix-community binary cache for faster builds.
    ```
 
    This provides a complete development environment with Rust toolchain, SQLx CLI, and all dependencies.

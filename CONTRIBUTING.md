@@ -56,6 +56,10 @@ Before contributing, make sure you have:
    ```
 
 #### Option 2: Nix Development Environment (Recommended)
+- If you don’t have Nix yet, you can use the Determinate installer to install nix and setup `nix flake` support be default:
+```
+   curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --determinate`
+```
 
 For a consistent, reproducible development environment:
 
@@ -67,7 +71,7 @@ For a consistent, reproducible development environment:
 
 2. **Enter the Nix development environment**
    ```bash
-   nix develop
+    nix develop --accept-flake-config # --accept-flake-config is needed to accept the nix-community binary cache for faster builds.
    ```
 
    This automatically provides:
@@ -91,9 +95,12 @@ For a consistent, reproducible development environment:
 For automatic environment activation:
 
 1. **Install direnv** (if not already installed)
+
+> Enable nix-direnv Follow: https://nix.dev/guides/recipes/direnv.html
+
 2. **Create .envrc file**
    ```bash
-   echo "use flake" > .envrc
+   echo "use flake . --accept-flake-config" > .envrc
    direnv allow
    ```
 3. **Environment loads automatically** when you `cd` into the project

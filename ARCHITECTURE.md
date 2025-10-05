@@ -436,10 +436,10 @@ The project includes a comprehensive Nix development environment (`flake.nix`):
 **Usage**:
 ```bash
 # Enter development environment
-nix develop
+nix develop --accept-flake-config # --accept-flake-config is needed to accept the nix-community binary cache for faster builds.
 
 # Automatic environment with direnv
-echo "use flake" > .envrc
+echo "use flake . --accept-flake-config" > .envrc
 direnv allow
 ```
 
