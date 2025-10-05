@@ -34,6 +34,7 @@ use crate::configuration::Settings;
 use crate::database::UrlDatabase;
 use crate::generator::ShortCodeGenerator;
 use axum_macros::FromRef;
+use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -83,9 +84,11 @@ use uuid::Uuid;
 pub struct AppState {
     /// Database connection for URL storage and retrieval operations
     pub database: Arc<dyn UrlDatabase>,
-
+    /// Short code generator for creating unique short URLs
     pub code_generator: Arc<dyn ShortCodeGenerator>,
-
+    /// The set of characters that can be used when generating short codes. \
+    /// Typically includes alphanumeric characters (e.g., `a-z`, `A-Z`, `0-9`).
+    pub allowed_chars: HashSet<char>,
     /// UUID-based API key for authenticating protected endpoints
     pub api_key: Uuid,
     /// Directory path containing Tera template files for web interface
@@ -138,6 +141,7 @@ impl AppState {
     pub fn new(
         database: Arc<dyn UrlDatabase>,
         code_generator: Arc<dyn ShortCodeGenerator>,
+        allowed_chars: HashSet<char>,
         api_key: Uuid,
         template_dir: String,
         config: Settings,
@@ -145,6 +149,7 @@ impl AppState {
         Self {
             database,
             api_key,
+            allowed_chars,
             template_dir,
             config,
             code_generator,

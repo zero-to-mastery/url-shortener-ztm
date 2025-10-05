@@ -47,7 +47,6 @@
 //! # }
 //! ```
 
-use crate::DatabaseType;
 use crate::configuration::Settings;
 use crate::database::postgres_sql::PostgresUrlDatabase;
 use crate::database::{SqliteUrlDatabase, UrlDatabase};
@@ -59,6 +58,7 @@ use crate::routes::{
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
+use crate::{DatabaseType, generator};
 use anyhow::{Context, Result};
 use axum::{
     Router,
@@ -66,6 +66,7 @@ use axum::{
     middleware::from_fn_with_state,
     routing::{get, post},
 };
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -231,6 +232,17 @@ impl Application {
         };
         let code_generator = build_generator(&config.shortener);
 
+        let allowed_chars: HashSet<char> = {
+            let mut set: HashSet<char> = HashSet::new();
+            if let Some(alpha) = &config.shortener.alphabet {
+                set.extend(alpha.chars());
+            } else {
+                set.extend(generator::DEFAULT_ALPHABET);
+            }
+
+            set
+        };
+
         // Set up the TCP listener and application state
         let api_key = config.application.api_key;
         let template_dir = config.application.templates.clone();
@@ -239,7 +251,14 @@ impl Application {
             .await
             .context("Unable to obtain a TCP listener...")?;
         let port = listener.local_addr()?.port();
-        let state = AppState::new(database, code_generator, api_key, template_dir, config);
+        let state = AppState::new(
+            database,
+            code_generator,
+            allowed_chars,
+            api_key,
+            template_dir,
+            config,
+        );
 
         // Build the application router, passing in the application state
         let router = build_router(state.clone())
@@ -419,6 +438,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
     // Build public routes (no authentication required)
     let public_routes = Router::new()
         .route("/", get(get_index))
+        .route("/{id}", get(get_redirect))
         .route("/api/health_check", get(health_check))
         .route("/api/redirect/{id}", get(get_redirect));
 
