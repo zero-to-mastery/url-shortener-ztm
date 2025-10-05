@@ -6,7 +6,7 @@
 // - URL length validation (max 2048 characters)
 // - Edge cases (exact limit, exceeding limit)
 
-use crate::helpers::spawn_app;
+use crate::helpers::{assert_json_ok, spawn_app};
 use axum::http::StatusCode;
 use regex::Regex;
 
@@ -20,13 +20,21 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
     // Act
     let response = app.post_api_with_key("/api/shorten", url).await;
 
-    // Assert
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = response.text().await.expect("Failed to read response body");
+    // Assert - Check that we get a valid JSON API response
+    let body = assert_json_ok(response).await;
+
+    // Extract and verify the shortened URL from the data field
+    let data = body.get("data").expect("Response should have data field");
+    let shortened_url = data
+        .get("shortened_url")
+        .and_then(|v| v.as_str())
+        .expect("Response should have shortened_url field");
+
+    // Verify the shortened URL format
     let hostname = "localhost";
-    let pattern = format!(r"^https://{}/[A-Za-z0-9]{{7}}\n$", hostname);
+    let pattern = format!(r"^https://{}/[A-Za-z0-9]{{7}}$", hostname);
     let regex = Regex::new(&pattern).expect("Failed to compile regex");
-    assert!(regex.is_match(&body));
+    assert!(regex.is_match(shortened_url));
 }
 
 /// Helper function to generate a URL of a specific total length.
@@ -69,16 +77,17 @@ async fn shorten_accepts_url_at_exact_max_length() {
     let response = app.post_api_with_key("/api/shorten", &url).await;
 
     // Assert - URL at max length should be accepted
-    assert_eq!(
-        response.status(),
-        StatusCode::OK,
-        "Expected 200 OK for URL at maximum allowed length"
-    );
+    let body = assert_json_ok(response).await;
 
-    // Verify we got a shortened URL back
-    let body = response.text().await.expect("Failed to read response body");
+    // Verify shortened URL is present in the response
+    let data = body.get("data").expect("Response should have data field");
+    let shortened_url: &str = data
+        .get("shortened_url")
+        .and_then(|v| v.as_str())
+        .expect("Response should have shortened_url field");
+
     assert!(
-        body.starts_with("https://localhost/"),
+        shortened_url.starts_with("https://localhost/"),
         "Expected shortened URL in response"
     );
 }
