@@ -73,7 +73,8 @@
               enable = true;
               settings = {
                 allFeatures = true;
-                extraArgs = "--all-targets -- -D warnings";
+                denyWarnings = true;
+                extraArgs = "--all-targets";
               };
             };
           };
@@ -126,9 +127,8 @@
                 # Ensure OpenSSL libs are available at runtime
                 export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.openssl ]}:$LD_LIBRARY_PATH"
 
-                # Optional: enable pre-commit hook installation inside the dev shell
-                # Uncomment the line below to activate
-                # ''${pre-commit-check.shellHook}
+                # enable pre-commit hook installation inside the dev shell
+                ${pre-commit-check.shellHook}
 
                 echo "[info] Using Fenix (stable) Rust toolchain."
               '';
