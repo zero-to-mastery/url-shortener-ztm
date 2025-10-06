@@ -171,6 +171,7 @@ impl TestApp {
         self.client
             .post(self.api(path))
             .header("x-api-key", self.api_key.to_string())
+            .header("host", "localhost:8000") // ← Add this line
             .body(body.into())
             .send()
             .await
