@@ -438,6 +438,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
     // Build public routes (no authentication required)
     let public_routes = Router::new()
         .route("/", get(get_index))
+        .nest_service("/static", ServeDir::new("static"))
         .route("/{id}", get(get_redirect))
         .route("/api/health_check", get(health_check))
         .route("/api/redirect/{id}", get(get_redirect));
@@ -480,7 +481,6 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .merge(protected_api)
         .merge(protected_admin)
         .merge(realworld_routes)
-        .fallback_service(ServeDir::new("static"))
         .with_state(state)
         .layer(
             ServiceBuilder::new()
