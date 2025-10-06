@@ -51,6 +51,7 @@ pub mod postgres_sql;
 pub mod sqlite;
 
 // Re-exports for convenience
+pub use postgres_sql::PostgresUrlDatabase;
 pub use sqlite::*;
 
 /// Database operation errors.
