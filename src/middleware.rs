@@ -1,26 +1,26 @@
-// # Middleware
-//
-// This module provides middleware functions for the URL shortener service.
-// Middleware functions are used to process requests before they reach the
-// main handler, enabling cross-cutting concerns like authentication.
-//
-// ## Available Middleware
-//
-// - [`check_api_key`] - Validates API key authentication for protected endpoints
-//
-// ## Usage
-//
-// Middleware is applied to routes using Axum's middleware system:
-//
-// ```rust,no_run
-// use axum::{Router, middleware::from_fn_with_state};
-// use url_shortener_ztm_lib::middleware::check_api_key;
-//
-// // Apply middleware to specific routes
-// let protected_routes = Router::new()
-//     .route("/api/shorten", post(shorten_handler))
-//     .route_layer(from_fn_with_state(state, check_api_key));
-/// ```
+//! # Middleware
+//!
+//! This module provides middleware functions for the URL shortener service.
+//! Middleware functions are used to process requests before they reach the
+//! main handler, enabling cross-cutting concerns like authentication.
+//!
+//! ## Available Middleware
+//!
+//! - [`check_api_key`] - Validates API key authentication for protected endpoints
+//!
+//! ## Usage
+//!
+//! Middleware is applied to routes using Axum's middleware system:
+//!
+//! ```rust,ignore
+//! use axum::{Router, middleware::from_fn_with_state};
+//! use url_shortener_ztm_lib::middleware::check_api_key;
+//!
+//! // Apply middleware to specific routes
+//! let protected_routes = Router::new()
+//!     .route("/api/shorten", post(shorten_handler))
+//!     .route_layer(from_fn_with_state(state, check_api_key));
+//! ```
 use crate::response::ApiResponse;
 use crate::state::AppState;
 use axum::{
@@ -72,15 +72,15 @@ use uuid::Uuid;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
-// use axum::{Router, middleware::from_fn_with_state, routing::post};
-// use url_shortener_ztm_lib::middleware::check_api_key;
-// use url_shortener_ztm_lib::state::AppState;
-//
-// // Apply to protected routes
-// let app = Router::new()
-//     .route("/api/shorten", post(shorten_handler))
-//     .route_layer(from_fn_with_state(app_state, check_api_key));
+/// ```rust,ignore
+/// use axum::{Router, middleware::from_fn_with_state, routing::post};
+/// use url_shortener_ztm_lib::middleware::check_api_key;
+/// use url_shortener_ztm_lib::state::AppState;
+///
+/// // Apply to protected routes
+/// let app = Router::new()
+///     .route("/api/shorten", post(post_shorten))
+///     .route_layer(from_fn_with_state(app_state, check_api_key));
 /// ```
 ///
 /// # Security Notes
