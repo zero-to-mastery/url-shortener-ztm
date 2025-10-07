@@ -144,8 +144,6 @@ class UrlShortener {
     this.error.style.display = "none";
   }
 
-
-
   async copyToClipboard() {
     try {
       await navigator.clipboard.writeText(this.shortUrl.value);
