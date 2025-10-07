@@ -9,6 +9,7 @@
 use crate::helpers::{assert_json_ok, spawn_app};
 use axum::http::StatusCode;
 use regex::Regex;
+use serde_json::json;
 
 /// Test that the shorten endpoint successfully shortens a valid URL
 #[tokio::test]
@@ -16,9 +17,20 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
     // Arrange
     let app = spawn_app().await;
     let url = r#"https://www.google.ca"#;
+    let request_body = json!({
+        "url": url
+    });
 
     // Act
-    let response = app.post_api_with_key("/api/shorten", url).await;
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
 
     // Assert - Check that we get a valid JSON API response
     let body = assert_json_ok(response).await;
@@ -30,9 +42,9 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
         .and_then(|v| v.as_str())
         .expect("Response should have shortened_url field");
 
-    // Verify the shortened URL format
+    // Verify the shortened URL format (nanoid generates variable length)
     let hostname = "localhost";
-    let pattern = format!(r"^https://{}/[A-Za-z0-9]{{7}}$", hostname);
+    let pattern = format!(r"^https://{}/[A-Za-z0-9_-]+$", hostname);
     let regex = Regex::new(&pattern).expect("Failed to compile regex");
     assert!(regex.is_match(shortened_url));
 }
@@ -74,7 +86,18 @@ async fn shorten_accepts_url_at_exact_max_length() {
     );
 
     // Act
-    let response = app.post_api_with_key("/api/shorten", &url).await;
+    let request_body = json!({
+        "url": url
+    });
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
 
     // Assert - URL at max length should be accepted
     let body = assert_json_ok(response).await;
@@ -107,7 +130,18 @@ async fn shorten_rejects_url_exceeding_max_length() {
     );
 
     // Act
-    let response = app.post_api_with_key("/api/shorten", &url).await;
+    let request_body = json!({
+        "url": url
+    });
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
 
     // Assert - URL exceeding max length should be rejected with 422
     assert_eq!(
@@ -140,7 +174,18 @@ async fn shorten_rejects_very_long_url() {
     );
 
     // Act
-    let response = app.post_api_with_key("/api/shorten", &url).await;
+    let request_body = json!({
+        "url": url
+    });
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
 
     // Assert
     assert_eq!(
@@ -148,4 +193,266 @@ async fn shorten_rejects_very_long_url() {
         StatusCode::UNPROCESSABLE_ENTITY,
         "Expected 422 for very long URL"
     );
+}
+
+/// Test that custom aliases work correctly
+#[tokio::test]
+async fn shorten_endpoint_accepts_valid_custom_alias() {
+    // Arrange
+    let app = spawn_app().await;
+    let url = "https://www.example.com";
+    let alias = "my-custom-link";
+    let request_body = json!({
+        "url": url,
+        "alias": alias
+    });
+
+    // Act
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
+
+    // Assert
+    let body = assert_json_ok(response).await;
+    let data = body.get("data").expect("Response should have data field");
+    
+    let shortened_url = data
+        .get("shortened_url")
+        .and_then(|v| v.as_str())
+        .expect("Response should have shortened_url field");
+    
+    let id = data
+        .get("id")
+        .and_then(|v| v.as_str())
+        .expect("Response should have id field");
+
+    assert_eq!(shortened_url, format!("https://localhost/{}", alias));
+    assert_eq!(id, alias);
+}
+
+/// Test that custom aliases are rejected if already in use
+#[tokio::test]
+async fn shorten_endpoint_rejects_duplicate_custom_alias() {
+    // Arrange
+    let app = spawn_app().await;
+    let url1 = "https://www.example1.com";
+    let url2 = "https://www.example2.com";
+    let alias = "duplicate-alias";
+    
+    // First request
+    let request_body1 = json!({
+        "url": url1,
+        "alias": alias
+    });
+    
+    let response1 = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body1)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
+    
+    assert_json_ok(response1).await;
+
+    // Second request with same alias
+    let request_body2 = json!({
+        "url": url2,
+        "alias": alias
+    });
+    
+    let response2 = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body2)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
+
+    // Assert - Second request should be rejected
+    assert_eq!(
+        response2.status(),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Expected 422 for duplicate alias"
+    );
+    
+    let body = response2.text().await.expect("Failed to read response body");
+    assert!(
+        body.contains("already in use"),
+        "Expected error message about alias being in use, got: {}",
+        body
+    );
+}
+
+/// Test that reserved custom aliases are rejected
+#[tokio::test]
+async fn shorten_endpoint_rejects_reserved_custom_alias() {
+    // Arrange
+    let app = spawn_app().await;
+    let url = "https://www.example.com";
+    let alias = "admin"; // reserved word
+    let request_body = json!({
+        "url": url,
+        "alias": alias
+    });
+
+    // Act
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
+
+    // Assert - Should be rejected
+    assert_eq!(
+        response.status(),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Expected 422 for reserved alias: '{}'",
+        alias
+    );
+}
+
+/// Test that custom aliases with invalid characters are rejected
+#[tokio::test]
+async fn shorten_endpoint_rejects_invalid_characters_custom_alias() {
+    // Arrange
+    let app = spawn_app().await;
+    let url = "https://www.example.com";
+    let alias = "invalid@alias"; // invalid character
+    let request_body = json!({
+        "url": url,
+        "alias": alias
+    });
+
+    // Act
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
+
+    // Assert - Should be rejected
+    assert_eq!(
+        response.status(),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Expected 422 for invalid character alias: '{}'",
+        alias
+    );
+}
+
+/// Test that too long custom aliases are rejected
+#[tokio::test]
+async fn shorten_endpoint_rejects_too_long_custom_alias() {
+    // Arrange
+    let app = spawn_app().await;
+    let url = "https://www.example.com";
+    let alias = "a".repeat(51); // too long
+    let request_body = json!({
+        "url": url,
+        "alias": alias
+    });
+
+    // Act
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
+
+    // Assert - Should be rejected
+    assert_eq!(
+        response.status(),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Expected 422 for too long alias"
+    );
+}
+
+/// Test that maximum length custom aliases are accepted
+#[tokio::test]
+async fn shorten_endpoint_accepts_maximum_length_custom_alias() {
+    // Arrange
+    let app = spawn_app().await;
+    let url = "https://www.example.com";
+    let alias = "a".repeat(50); // maximum length
+    let request_body = json!({
+        "url": url,
+        "alias": alias
+    });
+
+    // Act
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
+
+    // Assert
+    let body = assert_json_ok(response).await;
+    let data = body.get("data").expect("Response should have data field");
+    let id = data
+        .get("id")
+        .and_then(|v| v.as_str())
+        .expect("Response should have id field");
+    
+    assert_eq!(id, alias);
+}
+
+/// Test that minimum length custom aliases are accepted
+#[tokio::test]
+async fn shorten_endpoint_accepts_minimum_length_custom_alias() {
+    // Arrange
+    let app = spawn_app().await;
+    let url = "https://www.example.com";
+    let alias = "a"; // minimum length
+    let request_body = json!({
+        "url": url,
+        "alias": alias
+    });
+
+    // Act
+    let response = app.client
+        .post(app.url("/api/shorten"))
+        .header("x-api-key", app.api_key.to_string())
+        .header("host", "localhost:8000")
+        .header("content-type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .expect("Failed to execute POST request");
+
+    // Assert
+    let body = assert_json_ok(response).await;
+    let data = body.get("data").expect("Response should have data field");
+    let id = data
+        .get("id")
+        .and_then(|v| v.as_str())
+        .expect("Response should have id field");
+    
+    assert_eq!(id, alias);
 }

@@ -77,12 +77,14 @@ pub mod database;
 pub mod errors;
 pub mod generator;
 pub mod middleware;
+pub mod requests;
 pub mod response;
 pub mod routes;
 pub mod startup;
 pub mod state;
 pub mod telemetry;
 pub mod templates;
+pub mod validation;
 
 // Re-exports for convenience
 pub use configuration::*;

@@ -180,6 +180,7 @@ impl SqliteUrlDatabase {
 
         Ok(())
     }
+
 }
 
 #[async_trait]
@@ -271,6 +272,48 @@ impl UrlDatabase for SqliteUrlDatabase {
             None => Err(DatabaseError::NotFound),
         }
     }
+
+    /// Checks if an alias/ID already exists in the SQLite database.
+    ///
+    /// This implementation uses a simple SELECT query with COUNT to efficiently
+    /// check for the presence of an alias without retrieving the actual data.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The alias/ID to check for existence
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(bool)` where `true` means the alias exists and `false` means it's available.
+    /// Returns an error if a database error occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
+    /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
+    /// use url_shortener_ztm_lib::DatabaseType;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = DatabaseSettings {
+    ///     r#type: DatabaseType::Sqlite,
+    ///     url: "database.db".to_string(),
+    ///     create_if_missing: true,
+    /// };
+    /// let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let exists = db.alias_exists("my-alias").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn alias_exists(&self, id: &str) -> Result<bool, DatabaseError> {
+        let row = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM urls WHERE id = ?")
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(row.0 > 0)
+    }
 }
 
 /// Creates a SQLite connection pool from configuration settings.
@@ -291,7 +334,7 @@ impl UrlDatabase for SqliteUrlDatabase {
 ///
 /// ```rust,no_run
 /// use url_shortener_ztm_lib::DatabaseType;
-/// use url_shortener_ztm_lib::database::get_connection_pool;
+/// use url_shortener_ztm_lib::database::sqlite::get_connection_pool;
 /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {

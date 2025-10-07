@@ -6,9 +6,10 @@
 
 use crate::database::DatabaseError;
 use crate::errors::ApiError;
+use crate::requests::ShortenRequest;
 use crate::response::ApiResponse;
 use crate::state::AppState;
-use axum::extract::State;
+use axum::{extract::State, Json};
 use axum_extra::{TypedHeader, headers::Host};
 use axum_macros::debug_handler;
 use serde::Serialize;
@@ -33,9 +34,9 @@ pub struct ShortenResponse {
 
 /// URL shortening handler that creates short URLs from long URLs.
 ///
-/// This handler processes requests to shorten URLs by generating a unique
-/// identifier and storing the mapping in the database. It validates the
-/// input URL and returns the shortened URL in a simple text format.
+/// This handler processes requests to shorten URLs by either generating a unique
+/// identifier or using a custom alias provided by the user. It validates the
+/// input URL and alias, then stores the mapping in the database.
 ///
 /// # Endpoint
 ///
@@ -46,14 +47,25 @@ pub struct ShortenResponse {
 ///
 /// * `State(state)` - Application state containing database connection
 /// * `TypedHeader(header)` - Host header for constructing the response URL
-/// * `url` - The URL to shorten (provided in request body as plain text)
+/// * `Json(request)` - JSON request containing URL and optional custom alias
 ///
 /// # Request Format
 ///
-/// The request body should contain the URL to shorten as plain text:
+/// The request body should contain JSON with the URL and optional alias:
 ///
-/// ```text
-/// https://www.example.com/very/long/url/with/many/parameters
+/// ```json
+/// {
+///   "url": "https://www.example.com/very/long/url",
+///   "alias": "my-custom-link"
+/// }
+/// ```
+///
+/// Or without custom alias:
+///
+/// ```json
+/// {
+///   "url": "https://www.example.com/very/long/url"
+/// }
 /// ```
 ///
 /// # Response Format
@@ -67,66 +79,46 @@ pub struct ShortenResponse {
 ///   "status": 200,
 ///   "time": "2025-01-18T12:00:00Z",
 ///   "data": {
-///     "shortened_url": "https://localhost:8000/AbC123",
+///     "shortened_url": "https://localhost:8000/my-custom-link",
 ///     "original_url": "https://www.example.com/very/long/url",
-///     "id": "AbC123"
+///     "id": "my-custom-link"
 ///   }
 /// }
 /// ```
 ///
 /// # URL Generation
 ///
-/// Short URLs are generated using the `nanoid` library with the following characteristics:
-/// - **Length**: 6 characters
-/// - **Character Set**: URL-safe characters (A-Z, a-z, 0-9, _, -)
-/// - **Collision Handling**: If a duplicate ID is generated, an error is returned
+/// - **Custom Alias**: If provided, validates format and availability
+/// - **Auto-generated**: Uses nanoid library with 6 characters (A-Z, a-z, 0-9, _, -)
+/// - **Collision Handling**: Returns error if alias is already in use
 ///
 /// # Status Codes
 ///
 /// - `200 OK` - URL shortened successfully
-/// - `422 Unprocessable Entity` - Invalid URL format or URL exceeds maximum length
+/// - `422 Unprocessable Entity` - Invalid URL format, alias format, or alias already exists
 /// - `500 Internal Server Error` - Database error or ID collision
 ///
-/// # URL Validation
+/// # Validation
 ///
-/// The handler validates URLs using the `url` crate:
-/// - Must be a valid URL format
-/// - Must include a scheme (http:// or https://)
-/// - Must have a valid hostname
-/// - Must not exceed MAX_URL_LENGTH (2048 characters)
-///
-/// # Tracing
-///
-/// This handler is instrumented with tracing for request monitoring:
-/// - Successful shortenings are logged at info level
-/// - URL parsing errors are logged at error level
-/// - Database errors are logged at error level
-/// - ID collisions are logged at error level
+/// The handler validates:
+/// - URL format and length (max 2048 characters)
+/// - Custom alias format (A-Z, a-z, 0-9, _, - only)
+/// - Custom alias availability (not already in use)
+/// - Reserved aliases (admin, api, etc.)
 ///
 /// # Examples
 ///
 /// ```bash
-/// # Shorten a URL (protected endpoint)
-/// curl -d 'https://www.example.com' \
+/// # Shorten with custom alias (protected endpoint)
+/// curl -X POST http://localhost:8000/api/shorten \
 ///   -H "x-api-key: your-api-key" \
-///   http://localhost:8000/api/shorten
+///   -H "Content-Type: application/json" \
+///   -d '{"url": "https://www.example.com", "alias": "my-link"}'
 ///
-/// # Shorten a URL (public endpoint)
-/// curl -d 'https://www.example.com' \
-///   http://localhost:8000/api/public/shorten
-///
-/// # Expected response (JSON)
-/// {
-///   "success": true,
-///   "message": "ok",
-///   "status": 200,
-///   "time": "2025-01-18T12:00:00Z",
-///   "data": {
-///     "shortened_url": "https://localhost:8000/AbC123",
-///     "original_url": "https://www.example.com",
-///     "id": "AbC123"
-///   }
-/// }
+/// # Shorten without custom alias (public endpoint)
+/// curl -X POST http://localhost:8000/api/public/shorten \
+///   -H "Content-Type: application/json" \
+///   -d '{"url": "https://www.example.com"}'
 /// ```
 ///
 /// # Error Handling
@@ -134,41 +126,26 @@ pub struct ShortenResponse {
 /// This handler handles the following error cases:
 /// - **URL Too Long** - Returns 422 if URL exceeds MAX_URL_LENGTH
 /// - **Invalid URL Format** - Returns 422 with validation error
+/// - **Invalid Alias Format** - Returns 422 with alias validation error
+/// - **Alias Already Exists** - Returns 422 if custom alias is taken
+/// - **Reserved Alias** - Returns 422 if trying to use system-reserved alias
 /// - **Database Errors** - Returns 500 with internal error message
 /// - **ID Collision** - Returns 500 with collision error (rare occurrence)
-///
-/// # Security Considerations
-///
-/// - Input validation prevents malicious URL injection
-/// - Length validation prevents resource exhaustion attacks
-/// - Database queries use prepared statements to prevent SQL injection
-/// - API key authentication protects the main endpoint from abuse
-/// - Public endpoint provides limited access for testing
-///
-/// # Performance Considerations
-///
-/// - URL parsing is optimized for common formats
-/// - Length check is O(1) and performed before URL parsing
-/// - Database inserts are performed asynchronously
-/// - ID generation is fast and collision-resistant
-/// - Response format follows consistent JSON schema for better frontend integration
 #[debug_handler]
 #[instrument(name = "shorten" skip(state))]
 pub async fn post_shorten(
     State(state): State<AppState>,
     TypedHeader(header): TypedHeader<Host>,
-    url: String,
+    Json(request): Json<ShortenRequest>,
 ) -> Result<ApiResponse<ShortenResponse>, ApiError> {
-    let id = state.code_generator.generate().map_err(|e| {
-        tracing::error!("Code generation error: {:?}", e);
-        ApiError::Internal("Code generation failed".to_string())
-    })?;
+    // Validate the request (including custom alias if provided)
+    request.validate()?;
 
     // Validate URL length before parsing to prevent resource exhaustion
-    if url.len() > MAX_URL_LENGTH {
+    if request.url.len() > MAX_URL_LENGTH {
         tracing::warn!(
             "URL length {} exceeds maximum allowed length of {}",
-            url.len(),
+            request.url.len(),
             MAX_URL_LENGTH
         );
         return Err(ApiError::Unprocessable(format!(
@@ -177,25 +154,51 @@ pub async fn post_shorten(
         )));
     }
 
-    let p_url = Url::parse(&url).map_err(|e| {
-        tracing::error!("Unable to parse URL");
-        ApiError::Unprocessable(e.to_string())
+    let p_url = Url::parse(&request.url).map_err(|e| {
+        tracing::error!("Unable to parse URL: {}", e);
+        ApiError::Unprocessable(format!("Invalid URL format: {}", e))
     })?;
+
     let host = header.hostname();
 
-    match state.database.insert_url(id.as_ref(), p_url.as_str()).await {
+    // Determine the ID to use
+    let id = if let Some(ref alias) = request.alias {
+        // Check if custom alias is available
+        let exists = state.database.alias_exists(alias).await.map_err(|e| {
+            tracing::error!("Database error checking alias availability: {}", e);
+            ApiError::Internal("Failed to check alias availability".to_string())
+        })?;
+
+        if exists {
+            return Err(ApiError::Unprocessable(format!(
+                "Alias '{}' is already in use",
+                alias
+            )));
+        }
+
+        alias.clone()
+    } else {
+        // Generate random ID
+        state.code_generator.generate().map_err(|e| {
+            tracing::error!("Code generation error: {:?}", e);
+            ApiError::Internal("Code generation failed".to_string())
+        })?
+    };
+
+    // Insert URL into database
+    match state.database.insert_url(&id, p_url.as_str()).await {
         Ok(()) => {
             let shortened_url = format!("https://{}/{}", host, id);
             let response_data = ShortenResponse {
                 shortened_url,
-                original_url: url.clone(),
-                id: id.to_string(),
+                original_url: request.url.clone(),
+                id,
             };
-            tracing::info!("URL shortened and saved successfully...");
+            tracing::info!("URL shortened and saved successfully with ID: {}", response_data.id);
             Ok(ApiResponse::success(response_data))
         }
         Err(DatabaseError::Duplicate) => {
-            tracing::error!("Duplicate ID generated");
+            tracing::error!("Duplicate ID generated or custom alias already exists");
             Err(ApiError::Internal("ID collision occurred".to_string()))
         }
         Err(e) => {

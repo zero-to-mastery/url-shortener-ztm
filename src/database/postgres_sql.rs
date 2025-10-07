@@ -69,6 +69,48 @@ impl UrlDatabase for PostgresUrlDatabase {
             None => Err(DatabaseError::NotFound),
         }
     }
+
+    /// Checks if an alias/ID already exists in the PostgreSQL database.
+    ///
+    /// This implementation uses a simple SELECT query with COUNT to efficiently
+    /// check for the presence of an alias without retrieving the actual data.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The alias/ID to check for existence
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(bool)` where `true` means the alias exists and `false` means it's available.
+    /// Returns an error if a database error occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use url_shortener_ztm_lib::database::{PostgresUrlDatabase, UrlDatabase};
+    /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
+    /// use url_shortener_ztm_lib::DatabaseType;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = DatabaseSettings {
+    ///     r#type: DatabaseType::Postgres,
+    ///     url: "postgresql://user:pass@localhost/db".to_string(),
+    ///     create_if_missing: false,
+    /// };
+    /// let db = PostgresUrlDatabase::from_config(&config).await?;
+    /// let exists = db.alias_exists("my-alias").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn alias_exists(&self, id: &str) -> Result<bool, DatabaseError> {
+        let row = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM urls WHERE id = $1")
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(row.0 > 0)
+    }
 }
 
 pub async fn get_connection_pool(config: &DatabaseSettings) -> Result<PgPool, SqlxError> {

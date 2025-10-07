@@ -50,6 +50,7 @@ pub mod sqlite;
 
 // Re-exports for convenience
 pub use sqlite::*;
+pub use postgres_sql::*;
 
 /// Database operation errors.
 ///
@@ -167,4 +168,30 @@ pub trait UrlDatabase: Send + Sync {
     /// # }
     /// ```
     async fn get_url(&self, id: &str) -> Result<String, DatabaseError>;
+
+    /// Checks if an alias/ID already exists in the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The alias/ID to check for existence
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(bool)` where `true` means the alias exists and `false` means it's available.
+    /// Returns an error if a database error occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use url_shortener_ztm_lib::database::UrlDatabase;
+    ///
+    /// # async fn example<DB: UrlDatabase>(db: &DB) -> Result<(), Box<dyn std::error::Error>> {
+    /// let exists = db.alias_exists("my-alias").await?;
+    /// if !exists {
+    ///     println!("Alias is available!");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn alias_exists(&self, id: &str) -> Result<bool, DatabaseError>;
 }

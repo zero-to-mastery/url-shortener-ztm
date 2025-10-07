@@ -4,6 +4,7 @@
 
 use axum::http::StatusCode;
 use url_shortener_ztm_lib::get_configuration;
+use serde_json::json;
 
 use crate::helpers::spawn_app;
 
@@ -17,11 +18,14 @@ async fn rate_limiting_blocks_excess_requests() {
     let mut responses = Vec::new();
 
     for i in 0..2 {
+        let request_body = json!({
+            "url": format!("{}-{}", test_url, i)
+        });
         let response = app
             .client
             .post(app.url("/api/public/shorten"))
-            .header("content-type", "text/plain")
-            .body(format!("{}-{}", test_url, i))
+            .header("content-type", "application/json")
+            .json(&request_body)
             .send()
             .await
             .expect("Failed to execute request.");
@@ -35,11 +39,14 @@ async fn rate_limiting_blocks_excess_requests() {
     }
 
     // Make the 3rd request (should be rate limited)
+    let request_body = json!({
+        "url": format!("{}-rate-limited", test_url)
+    });
     let response = app
         .client
         .post(app.url("/api/public/shorten"))
-        .header("content-type", "text/plain")
-        .body(format!("{}-rate-limited", test_url))
+        .header("content-type", "application/json")
+        .json(&request_body)
         .send()
         .await
         .expect("Failed to execute request.");
@@ -67,11 +74,14 @@ async fn rate_limiting_provides_retry_after_headers() {
 
     // Act - Make requests up to the burst limit (2 requests)
     for i in 0..2 {
+        let request_body = json!({
+            "url": format!("{}-{}", test_url, i)
+        });
         let response = app
             .client
             .post(app.url("/api/public/shorten"))
-            .header("content-type", "text/plain")
-            .body(format!("{}-{}", test_url, i))
+            .header("content-type", "application/json")
+            .json(&request_body)
             .send()
             .await
             .expect("Failed to execute request.");
@@ -80,11 +90,14 @@ async fn rate_limiting_provides_retry_after_headers() {
     }
 
     // The 3rd request should be rate limited
+    let request_body = json!({
+        "url": format!("{}-rate-limited", test_url)
+    });
     let response = app
         .client
         .post(app.url("/api/public/shorten"))
-        .header("content-type", "text/plain")
-        .body(format!("{}-rate-limited", test_url))
+        .header("content-type", "application/json")
+        .json(&request_body)
         .send()
         .await
         .expect("Failed to execute request.");
@@ -132,10 +145,13 @@ async fn rate_limiting_works_per_ip_address() {
 
     // Use up the rate limit with client1
     for i in 0..2 {
+        let request_body = json!({
+            "url": format!("{}-{}", test_url, i)
+        });
         let response = client1
             .post(app.url("/api/public/shorten"))
-            .header("content-type", "text/plain")
-            .body(format!("{}-{}", test_url, i))
+            .header("content-type", "application/json")
+            .json(&request_body)
             .send()
             .await
             .expect("Failed to execute request.");
@@ -144,10 +160,13 @@ async fn rate_limiting_works_per_ip_address() {
     }
 
     // client2 should also be rate limited (same IP)
+    let request_body = json!({
+        "url": test_url
+    });
     let response = client2
         .post(app.url("/api/public/shorten"))
-        .header("content-type", "text/plain")
-        .body(test_url)
+        .header("content-type", "application/json")
+        .json(&request_body)
         .send()
         .await
         .expect("Failed to execute request.");
@@ -162,11 +181,14 @@ async fn health_check_is_not_rate_limited() {
 
     // Use up the rate limit with URL shortening requests
     for i in 0..2 {
+        let request_body = json!({
+            "url": format!("https://www.example.com/{}", i)
+        });
         let response = app
             .client
             .post(app.url("/api/public/shorten"))
-            .header("content-type", "text/plain")
-            .body(format!("https://www.example.com/{}", i))
+            .header("content-type", "application/json")
+            .json(&request_body)
             .send()
             .await
             .expect("Failed to execute request.");
@@ -175,11 +197,14 @@ async fn health_check_is_not_rate_limited() {
     }
 
     // Verify the next URL shortening request is rate limited
+    let request_body = json!({
+        "url": "https://www.example.com"
+    });
     let response = app
         .client
         .post(app.url("/api/public/shorten"))
-        .header("content-type", "text/plain")
-        .body("https://www.example.com")
+        .header("content-type", "application/json")
+        .json(&request_body)
         .send()
         .await
         .expect("Failed to execute request.");
@@ -206,12 +231,16 @@ async fn secure_api_is_rate_limited() {
 
     // Use up the rate limit with secure API requests
     for i in 0..2 {
+        let request_body = json!({
+            "url": format!("{}-{}", test_url, i)
+        });
         let response = app
             .client
             .post(app.url("/api/shorten"))
-            .header("content-type", "text/plain")
+            .header("content-type", "application/json")
             .header("x-api-key", app.api_key.to_string())
-            .body(format!("{}-{}", test_url, i))
+            .header("host", "localhost:8000")
+            .json(&request_body)
             .send()
             .await
             .expect("Failed to execute request.");
@@ -220,12 +249,16 @@ async fn secure_api_is_rate_limited() {
     }
 
     // The 3rd request should be rate limited even with valid API key
+    let request_body = json!({
+        "url": test_url
+    });
     let response = app
         .client
         .post(app.url("/api/shorten"))
-        .header("content-type", "text/plain")
+        .header("content-type", "application/json")
         .header("x-api-key", app.api_key.to_string())
-        .body(test_url)
+        .header("host", "localhost:8000")
+        .json(&request_body)
         .send()
         .await
         .expect("Failed to execute request.");
