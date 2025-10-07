@@ -48,8 +48,8 @@
         llvm = pkgs.llvmPackages_21;
 
         # Select the stable Rust toolchain from Fenix with required components
-        fenixPkgs = fenix.packages.${system};
-        rustToolchain = fenixPkgs.stable.withComponents [
+        fenixPkgs = fenix.packages.${system}.stable;
+        rustToolchain = fenixPkgs.withComponents [
           "cargo"
           "clippy"
           "rust-src"
@@ -65,12 +65,16 @@
             # Enable Nix formatting check (nixfmt)
             nixfmt-rfc-style.enable = true;
 
-            # Optional: Rust formatting (disabled by default)
+            # Rust formatting (disabled by default)
             # rustfmt.enable = true;
 
-            # Optional: Clippy linting (disabled by default)
+            # Clippy linting (enable by default)
             clippy = {
               enable = true;
+              packageOverrides = {
+                cargo = fenixPkgs.cargo;
+                clippy = fenixPkgs.clippy;
+              };
               settings = {
                 allFeatures = true;
                 denyWarnings = true;
