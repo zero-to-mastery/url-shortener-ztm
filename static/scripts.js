@@ -50,7 +50,13 @@ class UrlShortener {
       this.retryBtn.addEventListener("click", () => this.clearResults());
     }
 
+    document.getElementById("closeResult")?.addEventListener("click", () => this.clearResults());
+    document.getElementById("closeError")?.addEventListener("click", () => this.clearResults());
+
     this.urlInput.addEventListener("input", () => this.clearResults());
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.clearResults();
+    });
   }
 
   async handleSubmit(e) {
@@ -137,6 +143,8 @@ class UrlShortener {
     this.result.style.display = "none";
     this.error.style.display = "none";
   }
+
+
 
   async copyToClipboard() {
     try {
