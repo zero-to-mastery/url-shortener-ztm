@@ -1,45 +1,47 @@
-// # Database Abstraction Layer
-//
-// This module provides a trait-based database abstraction for the URL shortener service.
-// The abstraction allows for easy switching between different database backends while
-// maintaining a consistent interface.
-//
-// ## Architecture
-//
-// The database layer consists of:
-// - [`UrlDatabase`] trait - Defines the interface for URL storage operations
-// - [`DatabaseError`] enum - Comprehensive error handling for database operations
-// - Concrete implementations (currently SQLite)
-//
-// ## Supported Databases
-//
-// - **SQLite** - File-based database with automatic migrations (default)
-// - **In-memory SQLite** - For testing and development
-//
-// ## Usage
-//
-// ```rust,no_run
-// use url_shortener_ztm_lib::database::{UrlDatabase, SqliteUrlDatabase};
-// use url_shortener_ztm_lib::configuration::DatabaseSettings;
-//
-// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-// // Create database from configuration
-// let db = SqliteUrlDatabase::from_config(&DatabaseSettings {
-//     url: "database.db".to_string(),
-//     create_if_missing: true,
-// }).await?;
-//
-// // Run migrations
-// db.migrate().await?;
-//
-// // Store a URL
-// db.insert_url("abc123", "https://example.com").await?;
-//
-// // Retrieve a URL
-// let url = db.get_url("abc123").await?;
-// # Ok(())
-// # }
-// ```
+//! # Database Abstraction Layer
+//!
+//! This module provides a trait-based database abstraction for the URL shortener service.
+//! The abstraction allows for easy switching between different database backends while
+//! maintaining a consistent interface.
+//!
+//! ## Architecture
+//!
+//! The database layer consists of:
+//! - [`UrlDatabase`] trait - Defines the interface for URL storage operations
+//! - [`DatabaseError`] enum - Comprehensive error handling for database operations
+//! - Concrete implementations (currently SQLite)
+//!
+//! ## Supported Databases
+//!
+//! - **SQLite** - File-based database with automatic migrations (default)
+//! - **In-memory SQLite** - For testing and development
+//!
+//! ## Usage
+//!
+//! ```rust,no_run
+//! use url_shortener_ztm_lib::database::{UrlDatabase, SqliteUrlDatabase};
+//! use url_shortener_ztm_lib::configuration::DatabaseSettings;
+//! use url_shortener_ztm_lib::DatabaseType;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create a database from configuration
+//! let db = SqliteUrlDatabase::from_config(&DatabaseSettings {
+//!     r#type: DatabaseType::Sqlite,
+//!     url: "database.db".to_string(),
+//!     create_if_missing: true,
+//! }).await?;
+//!
+//! // Run migrations
+//! db.migrate().await?;
+//!
+//! // Store a URL
+//! db.insert_url("abc123", "https://example.com").await?;
+//!
+//! // Retrieve a URL
+//! let url = db.get_url("abc123").await?;
+//! # Ok(())
+//! # }
+//! ```
 
 use async_trait::async_trait;
 use std::fmt;
@@ -49,6 +51,7 @@ pub mod postgres_sql;
 pub mod sqlite;
 
 // Re-exports for convenience
+pub use postgres_sql::PostgresUrlDatabase;
 pub use sqlite::*;
 pub use postgres_sql::*;
 

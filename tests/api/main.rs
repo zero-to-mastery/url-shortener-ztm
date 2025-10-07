@@ -6,3 +6,4 @@ mod helpers;
 mod rate_limiting;
 mod redirect;
 mod shorten;
+mod static_assets;
