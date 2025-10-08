@@ -185,6 +185,18 @@ impl SqliteUrlDatabase {
 
 #[async_trait]
 impl UrlDatabase for SqliteUrlDatabase {
+    /// Retrieves the short ID by original URL from the SQLite database.
+    async fn get_id_by_url(&self, url: &str) -> Result<String, DatabaseError> {
+        let row = sqlx::query_as::<_, (String,)>("SELECT id FROM urls WHERE url = ?")
+            .bind(url)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        match row {
+            Some(record) => Ok(record.0),
+            None => Err(DatabaseError::NotFound),
+        }
+    }
     /// Stores a URL with the given ID in the SQLite database.
     ///
     /// This implementation uses a prepared statement for type safety and
