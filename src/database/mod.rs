@@ -52,8 +52,7 @@ pub mod sqlite;
 
 // Re-exports for convenience
 pub use postgres_sql::PostgresUrlDatabase;
-pub use sqlite::*;
-pub use postgres_sql::*;
+pub use sqlite::{SqliteUrlDatabase, get_connection_pool as get_sqlite_connection_pool};
 
 /// Database operation errors.
 ///

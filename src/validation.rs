@@ -110,9 +110,9 @@ pub fn validate_alias(alias: &str) -> Result<(), ApiError> {
     }
 
     // Validate character set using regex
-    let valid_chars_pattern = Regex::new(r"^[A-Za-z0-9_-]+$")
-        .expect("Failed to compile alias validation regex");
-    
+    let valid_chars_pattern =
+        Regex::new(r"^[A-Za-z0-9_-]+$").expect("Failed to compile alias validation regex");
+
     if !valid_chars_pattern.is_match(alias) {
         return Err(ApiError::Unprocessable(
             "Alias can only contain letters (A-Z, a-z), numbers (0-9), underscores (_), and hyphens (-)".to_string(),
@@ -120,15 +120,19 @@ pub fn validate_alias(alias: &str) -> Result<(), ApiError> {
     }
 
     // Check for consecutive special characters (optional enhancement)
-    if alias.contains("__") || alias.contains("--") || alias.contains("_-") || alias.contains("-_") {
+    if alias.contains("__") || alias.contains("--") || alias.contains("_-") || alias.contains("-_")
+    {
         return Err(ApiError::Unprocessable(
             "Alias cannot contain consecutive special characters".to_string(),
         ));
     }
 
     // Check that alias doesn't start or end with special characters
-    if alias.starts_with('_') || alias.starts_with('-') || 
-       alias.ends_with('_') || alias.ends_with('-') {
+    if alias.starts_with('_')
+        || alias.starts_with('-')
+        || alias.ends_with('_')
+        || alias.ends_with('-')
+    {
         return Err(ApiError::Unprocessable(
             "Alias cannot start or end with underscore or hyphen".to_string(),
         ));
@@ -164,7 +168,10 @@ pub fn validate_alias(alias: &str) -> Result<(), ApiError> {
 /// assert!(check_alias_availability("new-link", &existing).is_ok());
 /// assert!(check_alias_availability("existing-link", &existing).is_err());
 /// ```
-pub fn check_alias_availability(alias: &str, existing_aliases: &HashSet<String>) -> Result<(), ApiError> {
+pub fn check_alias_availability(
+    alias: &str,
+    existing_aliases: &HashSet<String>,
+) -> Result<(), ApiError> {
     if existing_aliases.contains(alias) {
         return Err(ApiError::Unprocessable(format!(
             "Alias '{}' is already in use",
@@ -189,7 +196,7 @@ mod tests {
             "test123",
             "my_awesome_link",
             "link-2024",
-            "a", // minimum length
+            "a",               // minimum length
             &max_length_alias, // maximum length
         ];
 
@@ -239,15 +246,34 @@ mod tests {
     fn test_reserved_aliases() {
         for reserved in RESERVED_ALIASES {
             // Test lowercase
-            assert!(validate_alias(reserved).is_err(), "Lowercase '{}' should be reserved", reserved);
+            assert!(
+                validate_alias(reserved).is_err(),
+                "Lowercase '{}' should be reserved",
+                reserved
+            );
             // Test uppercase
-            assert!(validate_alias(&reserved.to_uppercase()).is_err(), "Uppercase '{}' should be reserved", reserved);
+            assert!(
+                validate_alias(&reserved.to_uppercase()).is_err(),
+                "Uppercase '{}' should be reserved",
+                reserved
+            );
             // Test mixed case
-            let mixed = reserved.chars()
+            let mixed = reserved
+                .chars()
                 .enumerate()
-                .map(|(i, c)| if i % 2 == 0 { c.to_uppercase().collect::<String>() } else { c.to_lowercase().collect::<String>() })
+                .map(|(i, c)| {
+                    if i % 2 == 0 {
+                        c.to_uppercase().collect::<String>()
+                    } else {
+                        c.to_lowercase().collect::<String>()
+                    }
+                })
                 .collect::<String>();
-            assert!(validate_alias(&mixed).is_err(), "Mixed case '{}' should be reserved", mixed);
+            assert!(
+                validate_alias(&mixed).is_err(),
+                "Mixed case '{}' should be reserved",
+                mixed
+            );
         }
     }
 

@@ -180,7 +180,6 @@ impl SqliteUrlDatabase {
 
         Ok(())
     }
-
 }
 
 #[async_trait]

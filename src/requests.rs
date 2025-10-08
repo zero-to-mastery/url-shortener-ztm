@@ -4,8 +4,8 @@
 //! These structures handle deserialization of incoming JSON requests with proper
 //! validation and error handling.
 
-use serde::Deserialize;
 use crate::validation::validate_alias;
+use serde::Deserialize;
 
 /// Request structure for URL shortening with optional custom alias.
 ///
@@ -71,7 +71,7 @@ impl ShortenRequest {
         if let Some(ref alias) = self.alias {
             validate_alias(alias)?;
         }
-        
+
         Ok(())
     }
 }

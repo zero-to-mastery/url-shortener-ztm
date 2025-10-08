@@ -22,7 +22,8 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
     });
 
     // Act
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -89,7 +90,8 @@ async fn shorten_accepts_url_at_exact_max_length() {
     let request_body = json!({
         "url": url
     });
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -133,7 +135,8 @@ async fn shorten_rejects_url_exceeding_max_length() {
     let request_body = json!({
         "url": url
     });
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -177,7 +180,8 @@ async fn shorten_rejects_very_long_url() {
     let request_body = json!({
         "url": url
     });
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -208,7 +212,8 @@ async fn shorten_endpoint_accepts_valid_custom_alias() {
     });
 
     // Act
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -221,12 +226,12 @@ async fn shorten_endpoint_accepts_valid_custom_alias() {
     // Assert
     let body = assert_json_ok(response).await;
     let data = body.get("data").expect("Response should have data field");
-    
+
     let shortened_url = data
         .get("shortened_url")
         .and_then(|v| v.as_str())
         .expect("Response should have shortened_url field");
-    
+
     let id = data
         .get("id")
         .and_then(|v| v.as_str())
@@ -244,14 +249,15 @@ async fn shorten_endpoint_rejects_duplicate_custom_alias() {
     let url1 = "https://www.example1.com";
     let url2 = "https://www.example2.com";
     let alias = "duplicate-alias";
-    
+
     // First request
     let request_body1 = json!({
         "url": url1,
         "alias": alias
     });
-    
-    let response1 = app.client
+
+    let response1 = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -260,7 +266,7 @@ async fn shorten_endpoint_rejects_duplicate_custom_alias() {
         .send()
         .await
         .expect("Failed to execute POST request");
-    
+
     assert_json_ok(response1).await;
 
     // Second request with same alias
@@ -268,8 +274,9 @@ async fn shorten_endpoint_rejects_duplicate_custom_alias() {
         "url": url2,
         "alias": alias
     });
-    
-    let response2 = app.client
+
+    let response2 = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -285,8 +292,11 @@ async fn shorten_endpoint_rejects_duplicate_custom_alias() {
         StatusCode::UNPROCESSABLE_ENTITY,
         "Expected 422 for duplicate alias"
     );
-    
-    let body = response2.text().await.expect("Failed to read response body");
+
+    let body = response2
+        .text()
+        .await
+        .expect("Failed to read response body");
     assert!(
         body.contains("already in use"),
         "Expected error message about alias being in use, got: {}",
@@ -307,7 +317,8 @@ async fn shorten_endpoint_rejects_reserved_custom_alias() {
     });
 
     // Act
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -339,7 +350,8 @@ async fn shorten_endpoint_rejects_invalid_characters_custom_alias() {
     });
 
     // Act
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -371,7 +383,8 @@ async fn shorten_endpoint_rejects_too_long_custom_alias() {
     });
 
     // Act
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -402,7 +415,8 @@ async fn shorten_endpoint_accepts_maximum_length_custom_alias() {
     });
 
     // Act
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -419,7 +433,7 @@ async fn shorten_endpoint_accepts_maximum_length_custom_alias() {
         .get("id")
         .and_then(|v| v.as_str())
         .expect("Response should have id field");
-    
+
     assert_eq!(id, alias);
 }
 
@@ -436,7 +450,8 @@ async fn shorten_endpoint_accepts_minimum_length_custom_alias() {
     });
 
     // Act
-    let response = app.client
+    let response = app
+        .client
         .post(app.url("/api/shorten"))
         .header("x-api-key", app.api_key.to_string())
         .header("host", "localhost:8000")
@@ -453,6 +468,6 @@ async fn shorten_endpoint_accepts_minimum_length_custom_alias() {
         .get("id")
         .and_then(|v| v.as_str())
         .expect("Response should have id field");
-    
+
     assert_eq!(id, alias);
 }

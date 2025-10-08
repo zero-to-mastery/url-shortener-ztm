@@ -3,8 +3,8 @@
 // tests for rate limiting functionality
 
 use axum::http::StatusCode;
-use url_shortener_ztm_lib::get_configuration;
 use serde_json::json;
+use url_shortener_ztm_lib::get_configuration;
 
 use crate::helpers::spawn_app;
 

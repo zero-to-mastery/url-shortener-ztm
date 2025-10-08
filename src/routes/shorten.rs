@@ -9,7 +9,7 @@ use crate::errors::ApiError;
 use crate::requests::ShortenRequest;
 use crate::response::ApiResponse;
 use crate::state::AppState;
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use axum_extra::{TypedHeader, headers::Host};
 use axum_macros::debug_handler;
 use serde::Serialize;
@@ -162,17 +162,17 @@ pub async fn post_shorten(
     let host = header.hostname();
 
     // Check if URL already exists (only for non-custom aliases)
-    if request.alias.is_none() {
-        if let Ok(existing_id) = state.database.get_id_by_url(p_url.as_str()).await {
-            let shortened_url = format!("https://{}/{}", host, existing_id);
-            let response_data = ShortenResponse {
-                shortened_url,
-                original_url: request.url.clone(),
-                id: existing_id,
-            };
-            tracing::info!("Duplicate URL detected, returning existing short ID");
-            return Ok(ApiResponse::success(response_data));
-        }
+    if request.alias.is_none()
+        && let Ok(existing_id) = state.database.get_id_by_url(p_url.as_str()).await
+    {
+        let shortened_url = format!("https://{}/{}", host, existing_id);
+        let response_data = ShortenResponse {
+            shortened_url,
+            original_url: request.url.clone(),
+            id: existing_id,
+        };
+        tracing::info!("Duplicate URL detected, returning existing short ID");
+        return Ok(ApiResponse::success(response_data));
     }
 
     // Determine the ID to use
@@ -208,7 +208,10 @@ pub async fn post_shorten(
                 original_url: request.url.clone(),
                 id,
             };
-            tracing::info!("URL shortened and saved successfully with ID: {}", response_data.id);
+            tracing::info!(
+                "URL shortened and saved successfully with ID: {}",
+                response_data.id
+            );
             Ok(ApiResponse::success(response_data))
         }
         Err(DatabaseError::Duplicate) => {
