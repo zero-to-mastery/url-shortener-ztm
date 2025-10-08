@@ -51,6 +51,7 @@ pub mod postgres_sql;
 pub mod sqlite;
 
 // Re-exports for convenience
+use crate::models::UrlRecord;
 pub use postgres_sql::PostgresUrlDatabase;
 pub use sqlite::*;
 
@@ -170,4 +171,10 @@ pub trait UrlDatabase: Send + Sync {
     /// # }
     /// ```
     async fn get_url(&self, id: &str) -> Result<String, DatabaseError>;
+    async fn get_id(&self, url: &str) -> Result<String, DatabaseError>;
+    async fn list_short_codes(
+        &self,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<UrlRecord>, DatabaseError>;
 }

@@ -9,6 +9,7 @@ use std::sync::{Arc, LazyLock};
 use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
 use url_shortener_ztm_lib::generator::{self, build_generator};
 use url_shortener_ztm_lib::get_configuration;
+use url_shortener_ztm_lib::shortcode::bloom_filter::build_bloom_pair;
 use url_shortener_ztm_lib::startup::build_router;
 use url_shortener_ztm_lib::state::AppState;
 use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
@@ -32,7 +33,7 @@ pub struct TestApp {
     pub address: String,
     pub _port: u16,
     pub client: reqwest::Client,
-    pub database: Arc<dyn UrlDatabase>,
+    pub _database: Arc<dyn UrlDatabase>,
     pub api_key: Uuid,
 }
 
@@ -56,8 +57,9 @@ pub async fn spawn_app() -> TestApp {
     let sqlite_db = SqliteUrlDatabase::from_config(&configuration.database)
         .await
         .expect("Failed to create database");
+
     sqlite_db.migrate().await.expect("Failed to run migrations");
-    let database = Arc::new(sqlite_db);
+    let database: Arc<dyn UrlDatabase> = Arc::new(sqlite_db);
     let code_generator = build_generator(&configuration.shortener);
 
     let allowed_chars: HashSet<char> = {
@@ -74,9 +76,12 @@ pub async fn spawn_app() -> TestApp {
     // Store the API key for use in tests
     let api_key = configuration.application.api_key;
 
+    let blooms = build_bloom_pair(&database).await.unwrap();
+
     let test_app_state = AppState::new(
         database.clone(),
         code_generator,
+        blooms,
         allowed_chars,
         api_key,
         configuration.application.templates.clone(),
@@ -111,7 +116,7 @@ pub async fn spawn_app() -> TestApp {
         address: format!("http://127.0.0.1:{}", test_app_port),
         _port: test_app_port,
         client,
-        database,
+        _database: database,
         api_key,
     }
 }
