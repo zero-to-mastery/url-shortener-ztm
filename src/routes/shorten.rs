@@ -21,6 +21,7 @@ use url::Url;
 /// RFC 2616 doesn't specify a limit, but most browsers support 2000+ characters.
 /// We use 2048 as a reasonable limit to prevent abuse while supporting legitimate URLs.
 const MAX_URL_LENGTH: usize = 2048;
+const MAX_ID_RETRIES: usize = 8;
 
 #[derive(Debug, Serialize)]
 pub struct ShortenResponse {
@@ -132,7 +133,7 @@ pub struct ShortenResponse {
 /// - **Database Errors** - Returns 500 with internal error message
 /// - **ID Collision** - Returns 500 with collision error (rare occurrence)
 #[debug_handler]
-#[instrument(name = "shorten" skip(state))]
+#[instrument(name = "shorten", skip(state))]
 pub async fn post_shorten(
     State(state): State<AppState>,
     TypedHeader(header): TypedHeader<Host>,
@@ -148,6 +149,9 @@ pub async fn post_shorten(
             request.url.len(),
             MAX_URL_LENGTH
         );
+    // 1) Early length validation to prevent resource exhaustion
+    if url.len() > MAX_URL_LENGTH {
+        tracing::warn!("URL length {} exceeds max {}", url.len(), MAX_URL_LENGTH);
         return Err(ApiError::Unprocessable(format!(
             "URL exceeds maximum allowed length of {} characters",
             MAX_URL_LENGTH
@@ -217,10 +221,103 @@ pub async fn post_shorten(
         Err(DatabaseError::Duplicate) => {
             tracing::error!("Duplicate ID generated or custom alias already exists");
             Err(ApiError::Internal("ID collision occurred".to_string()))
-        }
-        Err(e) => {
-            tracing::error!("Database error: {}", e);
-            Err(ApiError::Internal(e.to_string()))
+    // 2) Parse and normalize the URL (lowercase host, remove fragments, etc.)
+    let norm = normalize_url(&url).map_err(|e| {
+        tracing::error!("Unable to parse URL: {}", e);
+        ApiError::Unprocessable(e.to_string())
+    })?;
+
+    let hostname = header.hostname();
+
+    // 3) Fast path: check Bloom filter (long → short).
+    // If it may exist, verify with the database.
+    if state.blooms.l2s.may_contain(norm.as_str()) {
+        match state.database.get_id_by_url(&norm).await {
+            Ok(existing_id) => {
+                tracing::info!("Hit existing mapping via bloom+db");
+                return Ok(make_response(hostname, &existing_id, &norm));
+            }
+            Err(DatabaseError::NotFound) => {
+                // False positive; proceed to insertion path.
+            }
+            Err(e) => {
+                tracing::error!("Database error on get_id: {}", e);
+                return Err(ApiError::Internal(e.to_string()));
+            }
         }
     }
+
+    // 4) Insert path: generate IDs and retry on duplicate collisions
+    let id = insert_with_retry(&state, &norm).await?;
+
+    // 5) Optionally update Bloom filters after successful insertion
+    state.blooms.s2l.insert(id.as_str());
+    state.blooms.l2s.insert(norm.as_str());
+
+    tracing::info!("URL shortened and saved successfully");
+    Ok(make_response(hostname, &id, &norm))
+}
+
+/// Parses and normalizes a URL:
+/// - Enforces http/https schemes
+/// - Removes fragments
+/// - Lowercases host
+fn normalize_url(raw: &str) -> Result<String, url::ParseError> {
+    let mut u = Url::parse(raw)?;
+    // Only allow http/https schemes
+    match u.scheme() {
+        "http" | "https" => {}
+        _ => return Err(url::ParseError::RelativeUrlWithoutBase),
+    }
+
+    // Remove fragment if any
+    u.set_fragment(None);
+
+    // Lowercase host (Url usually does this automatically, but we ensure it)
+    if let Some(h) = u.host_str() {
+        let lower = h.to_ascii_lowercase();
+        if lower != h {
+            let _ = u.set_host(Some(&lower));
+        }
+    }
+
+    // Additional normalization (e.g., trailing slash, query sorting) can be added here
+    Ok(u.to_string())
+}
+
+/// Inserts a new URL, retrying ID generation if duplicates occur.
+/// Relies on the database's Duplicate error to ensure atomicity and avoid TOCTOU issues.
+async fn insert_with_retry(state: &AppState, norm_url: &str) -> Result<String, ApiError> {
+    for attempt in 0..MAX_ID_RETRIES {
+        let id = state.code_generator.generate().map_err(|e| {
+            tracing::error!("Code generation error: {:?}", e);
+            ApiError::Internal("Code generation failed".to_string())
+        })?;
+
+        match state.database.insert_url(id.as_str(), norm_url).await {
+            Ok(()) => return Ok(id),
+            Err(DatabaseError::Duplicate) => {
+                tracing::warn!("ID collision on attempt {} — retrying", attempt + 1);
+                continue;
+            }
+            Err(e) => {
+                tracing::error!("Database error on insert: {}", e);
+                return Err(ApiError::Internal(e.to_string()));
+            }
+        }
+    }
+
+    tracing::error!("Exhausted ID retries ({} attempts)", MAX_ID_RETRIES);
+    Err(ApiError::Internal("ID collision occurred".into()))
+}
+
+/// Builds a unified response structure for shortened URLs.
+fn make_response(hostname: &str, id: &str, original_url: &str) -> ApiResponse<ShortenResponse> {
+    let shortened_url = format!("https://{}/{}", hostname, id);
+    let response_data = ShortenResponse {
+        shortened_url,
+        original_url: original_url.to_string(),
+        id: id.to_string(),
+    };
+    ApiResponse::success(response_data)
 }

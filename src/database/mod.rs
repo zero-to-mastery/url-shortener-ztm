@@ -51,6 +51,7 @@ pub mod postgres_sql;
 pub mod sqlite;
 
 // Re-exports for convenience
+use crate::models::UrlRecord;
 pub use postgres_sql::PostgresUrlDatabase;
 pub use sqlite::{SqliteUrlDatabase, get_connection_pool as get_sqlite_connection_pool};
 
@@ -192,4 +193,9 @@ pub trait UrlDatabase: Send + Sync {
     /// # }
     /// ```
     async fn alias_exists(&self, id: &str) -> Result<bool, DatabaseError>;
+    async fn list_short_codes(
+        &self,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<UrlRecord>, DatabaseError>;
 }

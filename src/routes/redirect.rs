@@ -93,6 +93,11 @@ pub async fn get_redirect(
         return Err(ApiError::NotFound("URL not found".to_string()));
     }
 
+    if !state.blooms.s2l.may_contain(&id) {
+        tracing::warn!("rejecting redirect: id is not in the short to long filter");
+        return Err(ApiError::NotFound("URL not found".to_string()));
+    }
+
     // Proceed with DB lookup
     match state.database.get_url(&id).await {
         Ok(url) => {

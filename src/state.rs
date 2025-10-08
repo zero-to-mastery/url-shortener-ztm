@@ -33,6 +33,7 @@
 use crate::configuration::Settings;
 use crate::database::UrlDatabase;
 use crate::generator::ShortCodeGenerator;
+use crate::shortcode::bloom_filter::BloomPair;
 use axum_macros::FromRef;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -86,6 +87,7 @@ pub struct AppState {
     pub database: Arc<dyn UrlDatabase>,
     /// Short code generator for creating unique short URLs
     pub code_generator: Arc<dyn ShortCodeGenerator>,
+    pub blooms: BloomPair,
     /// The set of characters that can be used when generating short codes. \
     /// Typically includes alphanumeric characters (e.g., `a-z`, `A-Z`, `0-9`).
     pub allowed_chars: HashSet<char>,
@@ -141,6 +143,7 @@ impl AppState {
     pub fn new(
         database: Arc<dyn UrlDatabase>,
         code_generator: Arc<dyn ShortCodeGenerator>,
+        blooms: BloomPair,
         allowed_chars: HashSet<char>,
         api_key: Uuid,
         template_dir: String,
@@ -148,11 +151,12 @@ impl AppState {
     ) -> Self {
         Self {
             database,
-            api_key,
+            code_generator,
+            blooms,
             allowed_chars,
             template_dir,
+            api_key,
             config,
-            code_generator,
         }
     }
 }

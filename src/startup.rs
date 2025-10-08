@@ -56,6 +56,8 @@ use crate::routes::{
     get_admin_dashboard, get_current_user, get_index, get_login, get_redirect, get_register,
     get_tags, get_user_profile, health_check, post_shorten, post_users_login, post_users_register,
 };
+
+use crate::shortcode::bloom_filter::build_bloom_pair;
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use crate::{DatabaseType, generator};
@@ -67,6 +69,7 @@ use axum::{
     routing::{get, post},
 };
 use std::collections::HashSet;
+
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -243,6 +246,8 @@ impl Application {
             set
         };
 
+        let blooms = build_bloom_pair(&database).await.unwrap();
+
         // Set up the TCP listener and application state
         let api_key = config.application.api_key;
         let template_dir = config.application.templates.clone();
@@ -254,6 +259,7 @@ impl Application {
         let state = AppState::new(
             database,
             code_generator,
+            blooms,
             allowed_chars,
             api_key,
             template_dir,
