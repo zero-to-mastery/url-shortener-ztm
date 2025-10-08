@@ -19,5 +19,7 @@
 
 # Ignore local DBs and weird files
 *.db
+*.db-wal
+*.db-shm
 NUL
 .pre-commit-config.yaml
