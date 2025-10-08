@@ -157,7 +157,7 @@ pub struct ShortenResponse {
 #[instrument(name = "shorten", skip(state))]
 pub async fn post_shorten(
     State(state): State<AppState>,
-    TypedHeader(host): TypedHeader<Host>,
+    TypedHeader(header): TypedHeader<Host>,
     url: String,
 ) -> Result<ApiResponse<ShortenResponse>, ApiError> {
     // 1) Early length validation to prevent resource exhaustion
@@ -175,12 +175,12 @@ pub async fn post_shorten(
         ApiError::Unprocessable(e.to_string())
     })?;
 
-    let hostname = host.hostname();
+    let hostname = header.hostname();
 
     // 3) Fast path: check Bloom filter (long → short).
     // If it may exist, verify with the database.
     if state.blooms.l2s.may_contain(norm.as_str()) {
-        match state.database.get_id(&norm).await {
+        match state.database.get_id_by_url(&norm).await {
             Ok(existing_id) => {
                 tracing::info!("Hit existing mapping via bloom+db");
                 return Ok(make_response(hostname, &existing_id, &norm));

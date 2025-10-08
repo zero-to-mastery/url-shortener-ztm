@@ -61,15 +61,10 @@ pub use sqlite::*;
 /// providing detailed error information for debugging and error handling.
 #[derive(Debug)]
 pub enum DatabaseError {
-    /// Error establishing or maintaining database connection
     ConnectionError(String),
-    /// Error executing database queries
     QueryError(String),
-    /// Error running database migrations
     MigrationError(String),
-    /// Requested record was not found
     NotFound,
-    /// Attempted to insert a duplicate record
     Duplicate,
 }
 
@@ -145,6 +140,7 @@ pub trait UrlDatabase: Send + Sync {
     /// # }
     /// ```
     async fn insert_url(&self, id: &str, url: &str) -> Result<(), DatabaseError>;
+    async fn get_id_by_url(&self, url: &str) -> Result<String, DatabaseError>;
 
     /// Retrieves a URL by its short ID from the database.
     ///
@@ -171,7 +167,6 @@ pub trait UrlDatabase: Send + Sync {
     /// # }
     /// ```
     async fn get_url(&self, id: &str) -> Result<String, DatabaseError>;
-    async fn get_id(&self, url: &str) -> Result<String, DatabaseError>;
     async fn list_short_codes(
         &self,
         offset: u64,
