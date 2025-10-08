@@ -57,6 +57,7 @@
 
 use super::{DatabaseError, UrlDatabase};
 use crate::configuration::DatabaseSettings;
+use crate::models::UrlRecord;
 use async_trait::async_trait;
 use sqlx::{
     Error as SqlxError, PgPool,
@@ -235,6 +236,23 @@ impl UrlDatabase for PostgresUrlDatabase {
             Some(record) => Ok(record.0),
             None => Err(DatabaseError::NotFound),
         }
+    }
+
+    async fn list_short_codes(
+        &self,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<UrlRecord>, DatabaseError> {
+        let records = sqlx::query_as::<_, UrlRecord>(
+            "SELECT id, url FROM urls ORDER BY id LIMIT $1 OFFSET $2",
+        )
+        .bind(limit as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(records)
     }
 }
 

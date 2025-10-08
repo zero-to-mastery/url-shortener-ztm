@@ -4,7 +4,7 @@
 // this endpoint should redirect the user to the shortened URL
 
 // dependencies
-use crate::helpers::{assert_redirect_to, spawn_app};
+use crate::helpers::{assert_json_ok, assert_redirect_to, spawn_app};
 use axum::http::StatusCode;
 
 #[tokio::test]
@@ -12,21 +12,33 @@ async fn redirect_endpoint_sends_user_to_shortened_destination_url() {
     // Arrange
     let app = spawn_app().await;
 
-    // Insert a test URL into the database
-    let test_id = "tstA123";
-    let test_url = "https://www.google.com";
+    // Ask the service to shorten a known URL through the public API
+    let original_url = "https://www.google.com";
+    let shorten_response = app.post_api_with_key("/api/shorten", original_url).await;
+    let body = assert_json_ok(shorten_response).await;
 
-    // Insert the test data into the database
-    app.database
-        .insert_url(test_id, test_url)
-        .await
-        .expect("Failed to insert test data into database");
+    let data = body
+        .get("data")
+        .and_then(|value| value.as_object())
+        .expect("shorten response did not include a data object");
+
+    let generated_id = data
+        .get("id")
+        .and_then(|value| value.as_str())
+        .expect("shorten response did not include an id");
+
+    let normalized_url = data
+        .get("original_url")
+        .and_then(|value| value.as_str())
+        .expect("shorten response did not include the stored original_url");
 
     // Act
-    let response = app.get_api(&format!("/api/redirect/{}", test_id)).await;
+    let response = app
+        .get_api(&format!("/api/redirect/{}", generated_id))
+        .await;
 
-    // Assert
-    assert_redirect_to(response, test_url, StatusCode::PERMANENT_REDIRECT).await;
+    // Assert - we expect a permanent redirect (HTTP 308) to the stored URL
+    assert_redirect_to(response, normalized_url, StatusCode::PERMANENT_REDIRECT).await;
 }
 
 #[tokio::test]
