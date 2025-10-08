@@ -57,7 +57,9 @@ use crate::routes::{
     get_tags, get_user_profile, health_check, post_shorten, post_users_login, post_users_register,
 };
 
-use crate::shortcode::bloom_filter::build_bloom_pair;
+use crate::shortcode::bloom_filter::{
+    L2S_SNAPSHOT, S2L_SNAPSHOT, build_bloom_pair, not_disable_bf_snapshots,
+};
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use crate::{DatabaseType, generator};
@@ -270,6 +272,24 @@ impl Application {
         let router = build_router(state.clone())
             .await
             .context("Failed to create the application router.")?;
+
+        let blooms = state.blooms.clone();
+
+        if not_disable_bf_snapshots() {
+            tokio::spawn(async move {
+                let mut ticker = tokio::time::interval(Duration::from_secs(60 * 5)); // 5min
+                loop {
+                    ticker.tick().await;
+                    if let Err(err) = blooms.s2l.save_to_file_with_hashes(S2L_SNAPSHOT) {
+                        tracing::warn!(error = %err, "failed to persist s2l Bloom snapshot");
+                    }
+                    if let Err(err) = blooms.l2s.save_to_file_with_hashes(L2S_SNAPSHOT) {
+                        tracing::warn!(error = %err, "failed to persist l2s Bloom snapshot");
+                    }
+                    tracing::info!("Bloom snapshots saved.");
+                }
+            });
+        }
 
         Ok(Self {
             port,
