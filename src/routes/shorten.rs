@@ -159,11 +159,6 @@ pub async fn post_shorten(
     TypedHeader(header): TypedHeader<Host>,
     url: String,
 ) -> Result<ApiResponse<ShortenResponse>, ApiError> {
-    let id = state.code_generator.generate().map_err(|e| {
-        tracing::error!("Code generation error: {:?}", e);
-        ApiError::Internal("Code generation failed".to_string())
-    })?;
-
     // Validate URL length before parsing to prevent resource exhaustion
     if url.len() > MAX_URL_LENGTH {
         tracing::warn!(
@@ -182,6 +177,23 @@ pub async fn post_shorten(
         ApiError::Unprocessable(e.to_string())
     })?;
     let host = header.hostname();
+
+    let existing_id = state.database.get_id_by_url(p_url.as_str()).await;
+    if let Ok(existing_id) = existing_id {
+        let shortened_url = format!("https://{}/{}", host, existing_id);
+        let response_data = ShortenResponse {
+            shortened_url,
+            original_url: url.clone(),
+            id: existing_id,
+        };
+        tracing::info!("Duplicate URL detected, returning existing short ID");
+        return Ok(ApiResponse::success(response_data));
+    }
+
+    let id = state.code_generator.generate().map_err(|e| {
+        tracing::error!("Code generation error: {:?}", e);
+        ApiError::Internal("Code generation failed".to_string())
+    })?;
 
     match state.database.insert_url(id.as_ref(), p_url.as_str()).await {
         Ok(()) => {
