@@ -8,10 +8,10 @@ use crate::database::DatabaseError;
 use crate::errors::ApiError;
 use crate::response::ApiResponse;
 use crate::state::AppState;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum_extra::{TypedHeader, headers::Host};
 use axum_macros::debug_handler;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::instrument;
 use url::Url;
 
@@ -21,6 +21,13 @@ use url::Url;
 /// We use 2048 as a reasonable limit to prevent abuse while supporting legitimate URLs.
 const MAX_URL_LENGTH: usize = 2048;
 const MAX_ID_RETRIES: usize = 8;
+const MAX_ALIAS_LENGTH: usize = 64;
+
+#[derive(Debug, Deserialize)]
+pub struct ShortenParams {
+    /// Optional custom alias to use instead of generating a random ID
+    pub alias: Option<String>,
+}
 
 #[derive(Debug, Serialize)]
 pub struct ShortenResponse {
@@ -158,6 +165,7 @@ pub struct ShortenResponse {
 pub async fn post_shorten(
     State(state): State<AppState>,
     TypedHeader(header): TypedHeader<Host>,
+    Query(params): Query<ShortenParams>,
     url: String,
 ) -> Result<ApiResponse<ShortenResponse>, ApiError> {
     // 1) Early length validation to prevent resource exhaustion
@@ -195,8 +203,22 @@ pub async fn post_shorten(
         }
     }
 
-    // 4) Insert path: generate IDs and retry on duplicate collisions
-    let id = insert_with_retry(&state, &norm).await?;
+    // 4) Insert path: use custom alias if provided, otherwise generate with retries
+    let id = if let Some(alias) = params.alias.as_deref() {
+        validate_alias(alias)?;
+        match state.database.insert_url(alias, &norm).await {
+            Ok(()) => alias.to_string(),
+            Err(DatabaseError::Duplicate) => {
+                return Err(ApiError::Conflict("Alias is already taken".to_string()));
+            }
+            Err(e) => {
+                tracing::error!("Database error on insert with alias: {}", e);
+                return Err(ApiError::Internal(e.to_string()));
+            }
+        }
+    } else {
+        insert_with_retry(&state, &norm).await?
+    };
 
     // 5) Optionally update Bloom filters after successful insertion
     state.blooms.s2l.insert(id.as_str());
@@ -268,4 +290,32 @@ fn make_response(hostname: &str, id: &str, original_url: &str) -> ApiResponse<Sh
         id: id.to_string(),
     };
     ApiResponse::success(response_data)
+}
+
+/// Validates a user-provided alias.
+/// Rules:
+/// - Non-empty
+/// - Max length = MAX_ALIAS_LENGTH
+/// - Allowed characters: A-Z, a-z, 0-9, underscore, hyphen
+fn validate_alias(alias: &str) -> Result<(), ApiError> {
+    if alias.is_empty() {
+        return Err(ApiError::Unprocessable("Alias cannot be empty".to_string()));
+    }
+    if alias.len() > MAX_ALIAS_LENGTH {
+        return Err(ApiError::Unprocessable(format!(
+            "Alias exceeds maximum length of {} characters",
+            MAX_ALIAS_LENGTH
+        )));
+    }
+
+    let is_allowed = alias
+        .chars()
+        .all(|ch| matches!(ch, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | '-'));
+    if !is_allowed {
+        return Err(ApiError::Unprocessable(
+            "Alias may contain only A-Z, a-z, 0-9, _ and -".to_string(),
+        ));
+    }
+
+    Ok(())
 }
