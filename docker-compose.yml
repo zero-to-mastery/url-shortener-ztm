@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  # PostgreSQL database for production
+  postgres:
+    image: postgres:15
+    container_name: url-shortener-postgres
+    environment:
+      POSTGRES_DB: urlshortener
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d urlshortener"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - production
+
+  # URL Shortener application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: url-shortener-app
+    ports:
+      - "8000:8000"
+    environment:
+      # Database configuration - defaults to SQLite for development
+      - APP_DATABASE__TYPE=${DATABASE_TYPE:-sqlite}
+      - APP_DATABASE__URL=${DATABASE_URL:-sqlite:data/database.db}
+      - APP_DATABASE__CREATE_IF_MISSING=true
+      # Application configuration
+      - APP_APPLICATION__HOST=0.0.0.0
+      - APP_APPLICATION__PORT=8000
+      - APP_APPLICATION__API_KEY=${API_KEY:-e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5}
+      - APP_APPLICATION__TEMPLATES=templates/**/*
+      # Rate limiting
+      - APP_RATE_LIMITING__ENABLED=true
+      - APP_RATE_LIMITING__REQUESTS_PER_SECOND=${RPS:-10}
+      - APP_RATE_LIMITING__BURST_SIZE=${BURST_SIZE:-5}
+    volumes:
+      # Mount SQLite database directory for development (ignored in production)
+      - sqlite_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+        profile: production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health_check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  sqlite_data:

@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  app:
+    environment:
+      # Development settings
+      - APP_RATE_LIMITING__REQUESTS_PER_SECOND=100
+      - APP_RATE_LIMITING__BURST_SIZE=50
+    volumes:
+      # Mount source code for hot reloading (if using a dev server)
+      - .:/app/src:ro
+      - ./configuration:/app/configuration:ro
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
+    # Override the default command to enable development features
+    command: ["./url-shortener-ztm"]
+    profiles:
+      - dev
