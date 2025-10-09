@@ -490,3 +490,9 @@ This project is licensed under the MIT License - see the [License.txt](License.t
 - Built with the excellent Rust web ecosystem
 - Inspired by modern web service architecture patterns
 - Thanks to the Rust community for amazing tools and libraries
+
+## 🛠️ Deployment Guide
+
+You can deploy this project to various platforms like Railway, Fly.io, and DigitalOcean.
+
+👉 Check the full [Deployment Guide](docs/deployment-guide.md) for detailed instructions.
