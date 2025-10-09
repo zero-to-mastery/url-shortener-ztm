@@ -12,6 +12,7 @@ A high-performance URL shortener service built with modern Rust technologies. Th
 - **URL validation**: Input validation with configurable URL length limits (2048 characters)
 - **Comprehensive logging**: Structured logging with tracing and request IDs
 - **Health monitoring**: Built-in health check endpoint
+- **API documentation**: OpenAPI 3.0 specification with interactive Swagger UI
 - **Web interface**: Admin panel with Tera templates
 - **API key protection**: Secure API endpoints with UUID-based authentication
 - **Nix development environment**: Flake-based dev environment with pre-commit hooks
@@ -102,7 +103,44 @@ curl http://localhost:8000/admin
 
 **Response**: HTML page with admin interface
 
-## 🚀 Quick Start
+## � API Documentation
+
+The URL Shortener service provides comprehensive API documentation with OpenAPI 3.0 specification and interactive Swagger UI.
+
+### Interactive API Documentation
+
+Visit the Swagger UI at: `http://localhost:8000/api/docs`
+
+The interactive documentation provides:
+
+- **Complete API reference** with all endpoints, parameters, and responses
+- **Interactive testing** - Try out API calls directly from your browser
+- **Request/response examples** for all endpoints
+- **Authentication support** for protected endpoints
+- **Schema validation** with automatic request/response validation
+
+### OpenAPI Specification
+
+The OpenAPI 3.0 specification is available at: `http://localhost:8000/api/docs/openapi.yaml`
+
+This YAML file can be used with:
+
+- **API clients** like Postman, Insomnia, or REST Client
+- **Code generation tools** to generate client SDKs
+- **Documentation tools** for custom API documentation sites
+- **API testing tools** for automated testing
+
+### API Features Documented
+
+- **URL Shortening**: Create short URLs with optional custom aliases
+- **URL Redirection**: Fast redirects to original URLs
+- **Health Monitoring**: Service health checks
+- **Authentication**: API key-based authentication for protected endpoints
+- **Rate Limiting**: Built-in rate limiting information
+- **Error Handling**: Comprehensive error response documentation
+- **RealWorld API**: Conforming RealWorld API endpoints for user management
+
+## �🚀 Quick Start
 
 ### Prerequisites
 

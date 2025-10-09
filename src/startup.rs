@@ -55,6 +55,7 @@ use crate::middleware::check_api_key;
 use crate::routes::{
     get_admin_dashboard, get_current_user, get_index, get_login, get_redirect, get_register,
     get_tags, get_user_profile, health_check, post_shorten, post_users_login, post_users_register,
+    serve_openapi_spec, serve_swagger_ui,
 };
 
 use crate::shortcode::bloom_filter::{
@@ -489,6 +490,8 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
     let public_routes = Router::new()
         .route("/", get(get_index))
         .nest_service("/static", ServeDir::new("static"))
+        .route("/api/docs/openapi.yaml", get(serve_openapi_spec))
+        .route("/api/docs", get(serve_swagger_ui))
         .route("/{id}", get(get_redirect))
         .route("/api/health_check", get(health_check))
         .route("/api/redirect/{id}", get(get_redirect));
