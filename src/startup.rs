@@ -57,11 +57,14 @@ use crate::routes::{
     get_tags, get_user_profile, health_check, post_shorten, post_users_login, post_users_register,
 };
 
-use crate::shortcode::bloom_filter::build_bloom_pair;
+use crate::shortcode::bloom_filter::{
+    L2S_SNAPSHOT, S2L_SNAPSHOT, build_bloom_pair, not_disable_bf_snapshots,
+};
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
 use crate::{DatabaseType, generator};
 use anyhow::{Context, Result};
+use axum::http::{Request, Response};
 use axum::{
     Router,
     http::HeaderName,
@@ -79,9 +82,9 @@ use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
     services::ServeDir,
-    trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
+    trace::TraceLayer,
 };
-use tracing::Level;
+use tracing::Span;
 
 /// Handles graceful shutdown signals for the application.
 ///
@@ -271,6 +274,24 @@ impl Application {
             .await
             .context("Failed to create the application router.")?;
 
+        let blooms = state.blooms.clone();
+
+        if not_disable_bf_snapshots() {
+            tokio::spawn(async move {
+                let mut ticker = tokio::time::interval(Duration::from_secs(60 * 5)); // 5min
+                loop {
+                    ticker.tick().await;
+                    if let Err(err) = blooms.s2l.save_to_file_with_hashes(S2L_SNAPSHOT) {
+                        tracing::warn!(error = %err, "failed to persist s2l Bloom snapshot");
+                    }
+                    if let Err(err) = blooms.l2s.save_to_file_with_hashes(L2S_SNAPSHOT) {
+                        tracing::warn!(error = %err, "failed to persist l2s Bloom snapshot");
+                    }
+                    tracing::info!("Bloom snapshots saved.");
+                }
+            });
+        }
+
         Ok(Self {
             port,
             listener,
@@ -407,12 +428,35 @@ impl Application {
 pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
     // Define the tracing layer for request/response logging
     let trace_layer = TraceLayer::new_for_http()
-        .make_span_with(
-            DefaultMakeSpan::new()
-                .include_headers(true)
-                .level(Level::INFO),
-        )
-        .on_response(DefaultOnResponse::new().include_headers(true));
+        .make_span_with(|req: &Request<_>| {
+            let ua = req
+                .headers()
+                .get("user-agent")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("-");
+            tracing::info_span!("http",
+                method = %req.method(),
+                uri = %req.uri(),
+                user_agent = %ua,
+            )
+        })
+        .on_request(|req: &Request<_>, _span: &Span| {
+            tracing::info!(
+                "\nrequest:\n  method: {}\n  uri: {}\n  headers:\n{:#?}",
+                req.method(),
+                req.uri(),
+                req.headers()
+            );
+        })
+        .on_response(|res: &Response<_>, latency: Duration, _span: &Span| {
+            tracing::info!(
+                "\nresponse:\n  status: {}\n  elapsed_ms: {}\n  headers:\n{:#?}",
+                res.status(),
+                latency.as_millis(),
+                res.headers()
+            );
+        });
+
     let x_request_id = HeaderName::from_static("x-request-id");
 
     // Create rate limiting configuration if enabled

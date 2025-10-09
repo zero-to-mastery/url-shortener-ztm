@@ -3,10 +3,10 @@ use crate::database::UrlDatabase;
 use anyhow::{Context, Result};
 use fastbloom_rs::{BloomFilter, FilterBuilder, Membership};
 use parking_lot::RwLock;
-use std::{fs, path::Path, sync::Arc};
+use std::{env, fs, path::Path, sync::Arc};
 
-const S2L_SNAPSHOT: &str = "./data/s2lbf_snapshot.bin";
-const L2S_SNAPSHOT: &str = "./data/l2sbf_snapshot.bin";
+pub const S2L_SNAPSHOT: &str = "./data/s2lbf_snapshot.bin";
+pub const L2S_SNAPSHOT: &str = "./data/l2sbf_snapshot.bin";
 const EXPECTED: u64 = 100_000_000;
 const FPP: f64 = 0.01;
 const PAGE: u64 = 50_000;
@@ -14,6 +14,8 @@ const PAGE: u64 = 50_000;
 pub trait ProbSet: Send + Sync {
     fn may_contain(&self, key: &str) -> bool;
     fn insert(&self, key: &str);
+    fn save_to_file_with_hashes(&self, path: &str) -> Result<()>;
+
     fn extend<'a, I>(&self, items: I)
     where
         I: IntoIterator<Item = &'a str>,
@@ -61,7 +63,17 @@ impl LocalBloom {
             inner: RwLock::new(bf),
         })
     }
-    pub fn save(&self, path: &str) -> Result<()> {
+}
+
+impl ProbSet for LocalBloom {
+    fn may_contain(&self, key: &str) -> bool {
+        self.inner.read().contains(key.as_bytes())
+    }
+    fn insert(&self, key: &str) {
+        self.inner.write().add(key.as_bytes())
+    }
+
+    fn save_to_file_with_hashes(&self, path: &str) -> Result<()> {
         // Create the parent directory for the snapshot if it doesn't exist
         if let Some(parent) = Path::new(path).parent()
             && !parent.as_os_str().is_empty()
@@ -75,16 +87,8 @@ impl LocalBloom {
         }
         let mut bf = self.inner.write();
         bf.save_to_file_with_hashes(path);
-        Ok(())
-    }
-}
 
-impl ProbSet for LocalBloom {
-    fn may_contain(&self, key: &str) -> bool {
-        self.inner.read().contains(key.as_bytes())
-    }
-    fn insert(&self, key: &str) {
-        self.inner.write().add(key.as_bytes())
+        Ok(())
     }
 }
 
@@ -127,16 +131,24 @@ pub async fn build_bloom_pair(db: &Arc<dyn UrlDatabase>) -> Result<BloomPair> {
     let s2l = LocalBloom::from_items(shorts.iter().map(|v| &v[..]), EXPECTED, FPP);
     let l2s = LocalBloom::from_items(longs.iter().map(|v| &v[..]), EXPECTED, FPP);
 
-    // // Optionally persist the snapshots (non-fatal on failure)
-    // if let Err(err) = s2l.save(s2l_path.to_str().unwrap()) {
-    //     tracing::warn!(error = %err, "failed to persist s2l Bloom snapshot");
-    // }
-    // if let Err(err) = l2s.save(l2s_path.to_str().unwrap()) {
-    //     tracing::warn!(error = %err, "failed to persist l2s Bloom snapshot");
-    // }
+    if not_disable_bf_snapshots() {
+        if let Err(err) = s2l.save_to_file_with_hashes(s2l_path.to_str().unwrap()) {
+            tracing::warn!(error = %err, "failed to persist s2l Bloom snapshot");
+        }
+        if let Err(err) = l2s.save_to_file_with_hashes(l2s_path.to_str().unwrap()) {
+            tracing::warn!(error = %err, "failed to persist l2s Bloom snapshot");
+        }
+    }
 
     Ok(BloomPair {
         s2l: Arc::new(s2l),
         l2s: Arc::new(l2s),
     })
+}
+
+pub(crate) fn not_disable_bf_snapshots() -> bool {
+    !matches!(
+        env::var("BLOOM_SNAPSHOTS").as_deref(),
+        Ok("1") | Ok("true") | Ok("TRUE")
+    )
 }

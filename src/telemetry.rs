@@ -48,10 +48,8 @@ use axum::http::Request;
 use tower_http::request_id::{MakeRequestId, RequestId};
 use tracing::Subscriber;
 use tracing::subscriber::set_global_default;
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
 use tracing_subscriber::fmt::MakeWriter;
-use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 use uuid::Uuid;
 
 /// Request ID generator that creates UUID-based request identifiers.
@@ -157,6 +155,30 @@ impl MakeRequestId for MakeRequestUuid {
 /// let subscriber = get_subscriber("my-app".into(), "debug".into(), std::io::stderr);
 /// init_subscriber(subscriber);
 /// ```
+#[cfg(debug_assertions)]
+pub fn get_subscriber<Sink>(
+    _name: String,
+    env_filter: String,
+    sink: Sink,
+) -> impl Subscriber + Sync + Send
+where
+    Sink: for<'a> MakeWriter<'a> + Send + Sync + 'static,
+{
+    use tracing_subscriber::EnvFilter;
+
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter)),
+        )
+        .with_writer(sink)
+        .pretty()
+        .with_ansi(true)
+        .with_file(true)
+        .with_line_number(true)
+        .finish()
+}
+
+#[cfg(not(debug_assertions))]
 pub fn get_subscriber<Sink>(
     name: String,
     env_filter: String,
@@ -165,6 +187,9 @@ pub fn get_subscriber<Sink>(
 where
     Sink: for<'a> MakeWriter<'a> + Send + Sync + 'static,
 {
+    use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+    use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
+
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
     let formatting_layer = BunyanFormattingLayer::new(name, sink);

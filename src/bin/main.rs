@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     // Load application configuration from YAML files and environment variables
     tracing::info!("Reading configuration...");
     let configuration = get_configuration().expect("Failed to read configuration files.");
-    tracing::info!("Configuration: {:?}", configuration);
+    tracing::info!(%configuration, "Configuration loaded");
 
     // Build the application with database connection and router setup
     tracing::info!("Starting up the application...");

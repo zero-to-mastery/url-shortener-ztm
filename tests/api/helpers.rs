@@ -41,6 +41,7 @@ pub struct TestApp {
 pub async fn spawn_app() -> TestApp {
     // Ensure that the tracing is only initialized once
     LazyLock::force(&TRACING);
+    unsafe { std::env::set_var("BLOOM_SNAPSHOTS", "1") };
 
     // Randomise configuration to ensure test isolation
     let configuration = {
