@@ -138,7 +138,6 @@ This YAML file can be used with:
 - **Authentication**: API key-based authentication for protected endpoints
 - **Rate Limiting**: Built-in rate limiting information
 - **Error Handling**: Comprehensive error response documentation
-- **RealWorld API**: Conforming RealWorld API endpoints for user management
 
 ## �🚀 Quick Start
 
