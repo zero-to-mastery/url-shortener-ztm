@@ -5,10 +5,12 @@
 // - Basic URL shortening functionality
 // - URL length validation (max 2048 characters)
 // - Edge cases (exact limit, exceeding limit)
+// - URL normalization and slash validation
 
 use crate::helpers::{assert_json_ok, spawn_app};
 use axum::http::StatusCode;
 use regex::Regex;
+use url_shortener_ztm_lib::routes::shorten::normalize_url;
 
 /// Test that the shorten endpoint successfully shortens a valid URL
 #[tokio::test]
@@ -148,4 +150,160 @@ async fn shorten_rejects_very_long_url() {
         StatusCode::UNPROCESSABLE_ENTITY,
         "Expected 422 for very long URL"
     );
+}
+
+/// Unit tests for the normalize_url function
+/// Tests the slash validation functionality specifically
+#[cfg(test)]
+mod normalize_url_tests {
+    use super::*;
+    use url_shortener_ztm_lib::errors::ApiError;
+
+    /// Test that valid HTTP URLs with proper double slashes are accepted
+    #[test]
+    fn normalize_url_accepts_valid_http_urls() {
+        let test_cases = vec![
+            "http://example.com",
+            "http://example.com/path",
+            "http://example.com/path?query=value",
+            "http://example.com/path#fragment",
+            "http://subdomain.example.com",
+            "http://127.0.0.1:8080",
+            "http://localhost:3000/api/test",
+        ];
+
+        for url in test_cases {
+            let result = normalize_url(url);
+            assert!(result.is_ok(), "URL '{}' should be valid, got error: {:?}", url, result.err());
+            
+            let normalized = result.unwrap();
+            assert!(normalized.starts_with("http://"), "Normalized URL should start with http://");
+        }
+    }
+
+    /// Test that valid HTTPS URLs with proper double slashes are accepted
+    #[test]
+    fn normalize_url_accepts_valid_https_urls() {
+        let test_cases = vec![
+            "https://example.com",
+            "https://example.com/path",
+            "https://example.com/path?query=value",
+            "https://example.com/path#fragment",
+            "https://subdomain.example.com",
+            "https://127.0.0.1:8080",
+            "https://localhost:3000/api/test",
+        ];
+
+        for url in test_cases {
+            let result = normalize_url(url);
+            assert!(result.is_ok(), "URL '{}' should be valid, got error: {:?}", url, result.err());
+            
+            let normalized = result.unwrap();
+            assert!(normalized.starts_with("https://"), "Normalized URL should start with https://");
+        }
+    }
+
+    /// Test that URLs with missing slashes after scheme are rejected
+    #[test]
+    fn normalize_url_rejects_urls_with_missing_slashes() {
+        let test_cases = vec![
+            "http:example.com",           // Missing slashes after http:
+            "https:example.com",          // Missing slashes after https:
+            "http:/example.com",         // Only one slash
+            "https:/example.com",        // Only one slash
+            "http:",                      // Just scheme with no slashes
+            "https:",                     // Just scheme with no slashes
+        ];
+
+        for url in test_cases {
+            let result = normalize_url(url);
+            assert!(result.is_err(), "URL '{}' should be invalid", url);
+            
+            let error = result.unwrap_err();
+            assert!(matches!(error, ApiError::Unprocessable(_)), "Expected ApiError::Unprocessable for URL: '{}'", url);
+        }
+    }
+
+    /// Test that URLs with more than 2 slashes after scheme are rejected
+    #[test]
+    fn normalize_url_rejects_urls_with_too_many_slashes() {
+        let test_cases = vec![
+            "http:////example.com",       // 4 slashes after http:
+            "https://///example.com",    // 5 slashes after https:
+        ];
+
+        for url in test_cases {
+            let result = normalize_url(url);
+            assert!(result.is_err(), "URL '{}' should be invalid", url);
+            
+            let error = result.unwrap_err();
+            assert!(matches!(error, ApiError::Unprocessable(_)), "Expected ApiError::Unprocessable for URL: '{}'", url);
+        }
+    }
+
+    /// Test that non-HTTP/HTTPS schemes are rejected
+    #[test]
+    fn normalize_url_rejects_other_schemes() {
+        let test_cases = vec![
+            "ftp://example.com",
+            "file:///path/to/file",
+            "ws://example.com",
+            "wss://example.com",
+            "git://example.com",
+            "mailto:user@example.com",
+            "data:text/plain,Hello",
+        ];
+
+        for url in test_cases {
+            let result = normalize_url(url);
+            assert!(result.is_err(), "URL '{}' should be invalid", url);
+            
+            let error = result.unwrap_err();
+            assert!(matches!(error, ApiError::Unprocessable(_)), "Expected ApiError::Unprocessable for URL: '{}'", url);
+        }
+    }
+
+    /// Test that URL normalization works correctly (lowercase host, fragment removal)
+    #[test]
+    fn normalize_url_performs_correct_normalization() {
+        // Test lowercase host
+        let result = normalize_url("http://Example.COM/path");
+        assert!(result.is_ok());
+        let normalized = result.unwrap();
+        assert_eq!(normalized, "http://example.com/path");
+
+        // Test fragment removal
+        let result = normalize_url("http://example.com/path#fragment");
+        assert!(result.is_ok());
+        let normalized = result.unwrap();
+        assert_eq!(normalized, "http://example.com/path");
+
+        // Test both lowercase and fragment removal
+        let result = normalize_url("http://Example.COM/path#fragment");
+        assert!(result.is_ok());
+        let normalized = result.unwrap();
+        assert_eq!(normalized, "http://example.com/path");
+    }
+
+    /// Test edge cases for URL parsing
+    #[test]
+    fn normalize_url_handles_edge_cases() {
+        // Test with empty path
+        let result = normalize_url("http://example.com");
+        assert!(result.is_ok());
+        let normalized = result.unwrap();
+        assert_eq!(normalized, "http://example.com/");
+
+        // Test with special characters in host
+        let result = normalize_url("http://sub-domain.example.com");
+        assert!(result.is_ok());
+        let normalized = result.unwrap();
+        assert_eq!(normalized, "http://sub-domain.example.com/");
+
+        // Test with port numbers
+        let result = normalize_url("http://localhost:8080");
+        assert!(result.is_ok());
+        let normalized = result.unwrap();
+        assert_eq!(normalized, "http://localhost:8080/");
+    }
 }

@@ -13,7 +13,6 @@ use axum_extra::{TypedHeader, headers::Host};
 use axum_macros::debug_handler;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
-use url::Url;
 
 /// Maximum allowed URL length in characters.
 ///
@@ -232,27 +231,51 @@ pub async fn post_shorten(
 /// - Enforces http/https schemes
 /// - Removes fragments
 /// - Lowercases host
-fn normalize_url(raw: &str) -> Result<String, url::ParseError> {
-    let mut u = Url::parse(raw)?;
-    // Only allow http/https schemes
-    match u.scheme() {
-        "http" | "https" => {}
-        _ => return Err(url::ParseError::RelativeUrlWithoutBase),
-    }
+/// - Validates proper slashes after scheme using manual parsing
+pub fn normalize_url(raw: &str) -> Result<String, ApiError> {
+    let is_http = raw.starts_with("http://");
+    let is_https = raw.starts_with("https://");
 
-    // Remove fragment if any
-    u.set_fragment(None);
-
-    // Lowercase host (Url usually does this automatically, but we ensure it)
-    if let Some(h) = u.host_str() {
-        let lower = h.to_ascii_lowercase();
-        if lower != h {
-            let _ = u.set_host(Some(&lower));
+    if is_http || is_https {
+        let scheme_len = if is_http { 7 } else { 8 };
+        if raw[scheme_len..].starts_with('/') {
+            return Err(ApiError::Unprocessable(
+                "Wrong number of slashes (separators) in scheme".to_string(),
+            ));
         }
+
+        let mut u = url::Url::parse(raw).map_err(|e| ApiError::Unprocessable(e.to_string()))?;
+        u.set_fragment(None);
+
+        if let Some(h) = u.host_str() {
+            let lower = h.to_ascii_lowercase();
+            if lower != h {
+                let _ = u.set_host(Some(&lower));
+            }
+        }
+        return Ok(u.to_string());
     }
 
-    // Additional normalization (e.g., trailing slash, query sorting) can be added here
-    Ok(u.to_string())
+    // If it looks like a URL with a scheme but not http(s), call it what it is: unsupported scheme.
+    if let Some(pos) = raw.find("://") {
+        let scheme = &raw[..pos];
+        return Err(ApiError::Unprocessable(format!(
+            "Unsupported scheme: {}",
+            scheme
+        )));
+    }
+
+    // Explicitly catch http/https missing slashes like "http:example.com".
+    if raw.starts_with("http:") || raw.starts_with("https:") {
+        return Err(ApiError::Unprocessable(
+            "Wrong number of slashes (separators) in scheme".to_string(),
+        ));
+    }
+
+    // Everything else is just not a URL we handle.
+    Err(ApiError::Unprocessable(
+        "Unsupported or invalid URL".to_string(),
+    ))
 }
 
 /// Inserts a new URL, retrying ID generation if duplicates occur.
