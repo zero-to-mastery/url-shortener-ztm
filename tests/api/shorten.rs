@@ -174,10 +174,18 @@ mod normalize_url_tests {
 
         for url in test_cases {
             let result = normalize_url(url);
-            assert!(result.is_ok(), "URL '{}' should be valid, got error: {:?}", url, result.err());
-            
+            assert!(
+                result.is_ok(),
+                "URL '{}' should be valid, got error: {:?}",
+                url,
+                result.err()
+            );
+
             let normalized = result.unwrap();
-            assert!(normalized.starts_with("http://"), "Normalized URL should start with http://");
+            assert!(
+                normalized.starts_with("http://"),
+                "Normalized URL should start with http://"
+            );
         }
     }
 
@@ -196,10 +204,18 @@ mod normalize_url_tests {
 
         for url in test_cases {
             let result = normalize_url(url);
-            assert!(result.is_ok(), "URL '{}' should be valid, got error: {:?}", url, result.err());
-            
+            assert!(
+                result.is_ok(),
+                "URL '{}' should be valid, got error: {:?}",
+                url,
+                result.err()
+            );
+
             let normalized = result.unwrap();
-            assert!(normalized.starts_with("https://"), "Normalized URL should start with https://");
+            assert!(
+                normalized.starts_with("https://"),
+                "Normalized URL should start with https://"
+            );
         }
     }
 
@@ -207,20 +223,24 @@ mod normalize_url_tests {
     #[test]
     fn normalize_url_rejects_urls_with_missing_slashes() {
         let test_cases = vec![
-            "http:example.com",           // Missing slashes after http:
-            "https:example.com",          // Missing slashes after https:
-            "http:/example.com",         // Only one slash
-            "https:/example.com",        // Only one slash
-            "http:",                      // Just scheme with no slashes
-            "https:",                     // Just scheme with no slashes
+            "http:example.com",   // Missing slashes after http:
+            "https:example.com",  // Missing slashes after https:
+            "http:/example.com",  // Only one slash
+            "https:/example.com", // Only one slash
+            "http:",              // Just scheme with no slashes
+            "https:",             // Just scheme with no slashes
         ];
 
         for url in test_cases {
             let result = normalize_url(url);
             assert!(result.is_err(), "URL '{}' should be invalid", url);
-            
+
             let error = result.unwrap_err();
-            assert!(matches!(error, ApiError::Unprocessable(_)), "Expected ApiError::Unprocessable for URL: '{}'", url);
+            assert!(
+                matches!(error, ApiError::Unprocessable(_)),
+                "Expected ApiError::Unprocessable for URL: '{}'",
+                url
+            );
         }
     }
 
@@ -228,16 +248,20 @@ mod normalize_url_tests {
     #[test]
     fn normalize_url_rejects_urls_with_too_many_slashes() {
         let test_cases = vec![
-            "http:////example.com",       // 4 slashes after http:
-            "https://///example.com",    // 5 slashes after https:
+            "http:////example.com",   // 4 slashes after http:
+            "https://///example.com", // 5 slashes after https:
         ];
 
         for url in test_cases {
             let result = normalize_url(url);
             assert!(result.is_err(), "URL '{}' should be invalid", url);
-            
+
             let error = result.unwrap_err();
-            assert!(matches!(error, ApiError::Unprocessable(_)), "Expected ApiError::Unprocessable for URL: '{}'", url);
+            assert!(
+                matches!(error, ApiError::Unprocessable(_)),
+                "Expected ApiError::Unprocessable for URL: '{}'",
+                url
+            );
         }
     }
 
@@ -257,9 +281,13 @@ mod normalize_url_tests {
         for url in test_cases {
             let result = normalize_url(url);
             assert!(result.is_err(), "URL '{}' should be invalid", url);
-            
+
             let error = result.unwrap_err();
-            assert!(matches!(error, ApiError::Unprocessable(_)), "Expected ApiError::Unprocessable for URL: '{}'", url);
+            assert!(
+                matches!(error, ApiError::Unprocessable(_)),
+                "Expected ApiError::Unprocessable for URL: '{}'",
+                url
+            );
         }
     }
 
