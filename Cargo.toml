@@ -1,6 +1,6 @@
 [package]
 name = "url-shortener-ztm"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2024"
 
 [[bin]]
