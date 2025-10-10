@@ -1,0 +1,302 @@
+openapi: 3.0.3
+info:
+  title: URL Shortener API
+  description: A high-performance URL shortener service built with Rust and Axum
+  version: 1.0.0
+  contact:
+    name: URL Shortener Team
+    url: https://github.com/shresthashim/url-shortener-ztm
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://{host}:{port}
+    description: Production server
+    variables:
+      host:
+        default: localhost
+        description: Server hostname
+      port:
+        default: "8000"
+        description: Server port
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /api/health_check:
+    get:
+      summary: Health Check
+      description: Check if the service is running and healthy
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                success: true
+                message: "ok"
+                status: 200
+                time: "2025-10-09T12:00:00Z"
+                data: null
+
+  /api/redirect/{id}:
+    get:
+      summary: Redirect to Original URL
+      description: Redirect to the original URL associated with the given short ID
+      tags:
+        - Redirect
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The short URL identifier
+          schema:
+            type: string
+            minLength: 6
+            maxLength: 64
+            pattern: '^[A-Za-z0-9_-]+$'
+      responses:
+        '308':
+          description: Permanent redirect to original URL
+          headers:
+            Location:
+              description: The original URL to redirect to
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: Short URL not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "URL not found"
+                status: 404
+                time: "2025-10-09T12:00:00Z"
+                data: null
+
+  /api/shorten:
+    post:
+      summary: Shorten URL (Protected)
+      description: Create a short URL from a long URL (requires API key authentication)
+      tags:
+        - URL Shortening
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        description: The URL to shorten
+        content:
+          text/plain:
+            schema:
+              type: string
+              format: uri
+              maxLength: 2048
+              example: "https://www.example.com/very/long/url/with/many/parameters"
+      parameters:
+        - name: alias
+          in: query
+          required: false
+          description: Optional custom alias for the short URL
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+            pattern: '^[A-Za-z0-9_-]+$'
+      responses:
+        '200':
+          description: URL shortened successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortenResponse'
+              example:
+                success: true
+                message: "ok"
+                status: 200
+                time: "2025-10-09T12:00:00Z"
+                data:
+                  shortened_url: "https://localhost:8000/AbC123"
+                  original_url: "https://www.example.com/very/long/url"
+                  id: "AbC123"
+        '422':
+          description: Invalid URL format or URL too long
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "URL exceeds maximum allowed length of 2048 characters"
+                status: 422
+                time: "2025-10-09T12:00:00Z"
+                data: null
+        '409':
+          description: Alias already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Alias is already taken"
+                status: 409
+                time: "2025-10-09T12:00:00Z"
+                data: null
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/public/shorten:
+    post:
+      summary: Shorten URL (Public)
+      description: Create a short URL from a long URL (no authentication required)
+      tags:
+        - URL Shortening
+      requestBody:
+        required: true
+        description: The URL to shorten
+        content:
+          text/plain:
+            schema:
+              type: string
+              format: uri
+              maxLength: 2048
+              example: "https://www.example.com/very/long/url/with/many/parameters"
+      parameters:
+        - name: alias
+          in: query
+          required: false
+          description: Optional custom alias for the short URL
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+            pattern: '^[A-Za-z0-9_-]+$'
+      responses:
+        '200':
+          description: URL shortened successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortenResponse'
+              example:
+                success: true
+                message: "ok"
+                status: 200
+                time: "2025-10-09T12:00:00Z"
+                data:
+                  shortened_url: "https://localhost:8000/AbC123"
+                  original_url: "https://www.example.com/very/long/url"
+                  id: "AbC123"
+        '422':
+          description: Invalid URL format or URL too long
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "URL exceeds maximum allowed length of 2048 characters"
+                status: 422
+                time: "2025-10-09T12:00:00Z"
+                data: null
+        '409':
+          description: Alias already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: "Alias is already taken"
+                status: 409
+                time: "2025-10-09T12:00:00Z"
+                data: null
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the request was successful
+        message:
+          type: string
+          description: Optional message
+        status:
+          type: integer
+          description: HTTP status code
+        time:
+          type: string
+          format: date-time
+          description: Response timestamp in ISO 8601 format
+        data:
+          description: Response data (null for errors)
+      required:
+        - success
+        - message
+        - status
+        - time
+        - data
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: 'null'
+              description: Always null for error responses
+
+    ShortenResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                shortened_url:
+                  type: string
+                  format: uri
+                  description: The shortened URL
+                original_url:
+                  type: string
+                  format: uri
+                  description: The original URL that was shortened
+                id:
+                  type: string
+                  description: The unique identifier used in the shortened URL
+              required:
+                - shortened_url
+                - original_url
+                - id
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key for accessing protected endpoints</content>
+<parameter name="filePath">/home/shresthashim/Downloads/hacktoberfest-2025/url-shortener-ztm/openapi.yaml
