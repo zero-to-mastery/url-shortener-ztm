@@ -31,7 +31,7 @@ pub async fn serve_openapi_spec() -> impl axum::response::IntoResponse {
 
     axum::response::Response::builder()
         .header("content-type", "application/yaml")
-        .body(yaml_content)
+        .body(axum::body::Body::from(yaml_content))
         .unwrap()
 }
 
