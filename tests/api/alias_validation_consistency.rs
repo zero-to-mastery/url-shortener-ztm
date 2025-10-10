@@ -14,9 +14,13 @@ use crate::helpers::spawn_app;
 use axum::http::StatusCode;
 
 // Helper method for POST with query parameters
-async fn post_shorten_with_alias(app: &crate::helpers::TestApp, alias: &str, url: &str) -> reqwest::Response {
+async fn post_shorten_with_alias(
+    app: &crate::helpers::TestApp,
+    alias: &str,
+    url: &str,
+) -> reqwest::Response {
     let request_url = format!("{}?alias={}", app.api("shorten"), alias);
-    
+
     app.client
         .post(&request_url)
         .header("x-api-key", app.api_key.to_string())
@@ -48,9 +52,9 @@ async fn bug_alias_with_underscore_is_incorrectly_accepted() {
 
     // Verify the alias was created
     let body_text = response.text().await.expect("Failed to read response body");
-    let body: serde_json::Value = serde_json::from_str(&body_text)
-        .expect("Response should be valid JSON");
-    
+    let body: serde_json::Value =
+        serde_json::from_str(&body_text).expect("Response should be valid JSON");
+
     let data = body.get("data").expect("Response should have data field");
     let shortened_url = data
         .get("shortened_url")
@@ -65,7 +69,7 @@ async fn bug_alias_with_underscore_is_incorrectly_accepted() {
 
     // Now test if the alias can be accessed via redirect - this should fail
     let redirect_response = app.get(&format!("/{}", alias_with_underscore)).await;
-    
+
     // This demonstrates the inconsistency: alias was created but cannot be accessed
     assert_eq!(
         redirect_response.status(),
@@ -95,9 +99,9 @@ async fn bug_alias_with_hyphen_is_incorrectly_accepted() {
 
     // Verify the alias was created
     let body_text = response.text().await.expect("Failed to read response body");
-    let body: serde_json::Value = serde_json::from_str(&body_text)
-        .expect("Response should be valid JSON");
-    
+    let body: serde_json::Value =
+        serde_json::from_str(&body_text).expect("Response should be valid JSON");
+
     let data = body.get("data").expect("Response should have data field");
     let shortened_url = data
         .get("shortened_url")
@@ -112,7 +116,7 @@ async fn bug_alias_with_hyphen_is_incorrectly_accepted() {
 
     // Now test if the alias can be accessed via redirect - this should fail
     let redirect_response = app.get(&format!("/{}", alias_with_hyphen)).await;
-    
+
     // This demonstrates the inconsistency: alias was created but cannot be accessed
     assert_eq!(
         redirect_response.status(),
@@ -141,9 +145,9 @@ async fn alias_with_config_allowed_characters_is_accepted() {
 
     // Parse JSON response manually
     let body_text = response.text().await.expect("Failed to read response body");
-    let body: serde_json::Value = serde_json::from_str(&body_text)
-        .expect("Response should be valid JSON");
-    
+    let body: serde_json::Value =
+        serde_json::from_str(&body_text).expect("Response should be valid JSON");
+
     // Verify the alias was used in the response
     let data = body.get("data").expect("Response should have data field");
     let shortened_url = data
@@ -178,13 +182,13 @@ async fn demonstrate_character_validation_inconsistency() {
 
     // Test characters that are in the hardcoded validation but NOT in the config
     let problematic_characters = ['_', '-'];
-    
+
     for &char in &problematic_characters {
         println!(
-            "Testing alias with '{}' character - should be rejected consistently", 
+            "Testing alias with '{}' character - should be rejected consistently",
             char
         );
-        
+
         // The current implementation allows these characters in validate_alias()
         // but they would be rejected in the redirect validation
         // This creates an inconsistency that should be fixed
@@ -196,13 +200,13 @@ async fn demonstrate_character_validation_inconsistency() {
 async fn validate_configuration_alphabet_usage() {
     // This test verifies that the configuration alphabet is properly loaded
     // and used consistently across the application
-    
+
     let app = spawn_app().await;
     let url = "https://example.com";
-    
+
     // Test with a character that should be in the config alphabet
     let config_alias = "ABC1234"; // All characters from generator.yml alphabet, length 7 to match config
-    
+
     let response = post_shorten_with_alias(&app, config_alias, url).await;
 
     // Should succeed
@@ -226,20 +230,17 @@ async fn validate_configuration_alphabet_usage() {
 #[tokio::test]
 async fn demonstrate_core_bug_with_underscore_and_hyphen() {
     let url = "https://example.com";
-    
+
     // Test cases that demonstrate the specific bug with _ and - characters
-    let bug_test_cases = vec![
-        ("alias_with_underscore", '_'),
-        ("alias-with-hyphen", '-'),
-    ];
-    
+    let bug_test_cases = vec![("alias_with_underscore", '_'), ("alias-with-hyphen", '-')];
+
     for (alias, _problematic_char) in bug_test_cases {
         // Create a fresh app instance for each test case to avoid interference
         let app = spawn_app().await;
-        
+
         // Try to create the alias
         let response = post_shorten_with_alias(&app, alias, url).await;
-            
+
         // BUG: Currently returns 200 instead of 422
         assert_eq!(
             response.status(),
@@ -247,13 +248,15 @@ async fn demonstrate_core_bug_with_underscore_and_hyphen() {
             "BUG: Alias '{}' is currently accepted but should be rejected consistently",
             alias
         );
-        
+
         // Verify the alias was created (demonstrating the bug)
         let body = response.text().await.expect("Failed to read response body");
-        let body_json: serde_json::Value = serde_json::from_str(&body)
-            .expect("Response should be valid JSON");
-        
-        let data = body_json.get("data").expect("Response should have data field");
+        let body_json: serde_json::Value =
+            serde_json::from_str(&body).expect("Response should be valid JSON");
+
+        let data = body_json
+            .get("data")
+            .expect("Response should have data field");
         let shortened_url = data
             .get("shortened_url")
             .and_then(|v| v.as_str())
@@ -265,10 +268,10 @@ async fn demonstrate_core_bug_with_underscore_and_hyphen() {
             alias,
             shortened_url
         );
-        
+
         // Test if the alias can be accessed via redirect - this should fail due to character validation inconsistency
         let redirect_response = app.get(&format!("/{}", alias)).await;
-        
+
         assert_eq!(
             redirect_response.status(),
             StatusCode::NOT_FOUND,
