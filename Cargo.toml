@@ -1,11 +1,15 @@
 [package]
 name = "url-shortener-ztm"
-version = "0.17.1"
+version = "0.18.0"
 edition = "2024"
 
 [[bin]]
 name = "url-shortener-ztm"
 path = "src/bin/main.rs"
+
+[[bin]]
+name = "url-shortener-ztm-shuttle"
+path = "src/bin/shuttle.rs"
 
 [lib]
 name = "url_shortener_ztm_lib"
@@ -23,6 +27,8 @@ nanoid = "0.4.0"
 parking_lot = "0.12.5"
 serde = { version = "1.0.226", features = ["derive"] }
 serde-aux = "4.7.0"
+shuttle-axum = "0.57.0"
+shuttle-runtime = { version = "0.57.0", default-features = false }
 sqlx = { version = "0.8.6", features = [ "runtime-tokio", "tls-rustls", "postgres" , "sqlite" ] }
 tera = "1.20.0"
 thiserror = "2.0.17"

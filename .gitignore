@@ -23,3 +23,6 @@
 *.db-shm
 NUL
 .pre-commit-config.yaml
+
+# Shuttle
+Secrets*.toml

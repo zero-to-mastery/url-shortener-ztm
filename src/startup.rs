@@ -180,7 +180,7 @@ pub struct Application {
     /// TCP listener for incoming connections
     listener: TcpListener,
     /// Axum router with all configured routes and middleware
-    router: Router,
+    pub router: Router,
     /// Application state shared across all handlers
     state: AppState,
 }
