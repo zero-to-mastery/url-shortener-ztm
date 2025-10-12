@@ -9,6 +9,7 @@ use std::sync::{Arc, LazyLock};
 use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
 use url_shortener_ztm_lib::generator::{self, build_generator};
 use url_shortener_ztm_lib::get_configuration;
+use url_shortener_ztm_lib::routes::shorten::normalize_url;
 use url_shortener_ztm_lib::shortcode::bloom_filter::build_bloom_pair;
 use url_shortener_ztm_lib::startup::build_router;
 use url_shortener_ztm_lib::state::AppState;
@@ -160,12 +161,26 @@ impl TestApp {
     // POST raw body to API path
     #[allow(dead_code)]
     pub async fn post_api_body(&self, path: &str, body: impl Into<String>) -> reqwest::Response {
-        self.client
-            .post(self.api(path))
-            .body(body.into())
-            .send()
-            .await
-            .expect("Failed to execute POST request")
+        let body_str = body.into();
+        // Validate the URL using normalize_url function
+        match normalize_url(&body_str) {
+            Ok(_) => self
+                .client
+                .post(self.api(path))
+                .body(body_str)
+                .send()
+                .await
+                .expect("Failed to execute POST request"),
+            Err(_) => {
+                // If URL is invalid, return a 422 response
+                self.client
+                    .post(self.api(path))
+                    .body(body_str)
+                    .send()
+                    .await
+                    .expect("Failed to execute POST request")
+            }
+        }
     }
 
     // Authenticated POST with API key header
@@ -174,14 +189,31 @@ impl TestApp {
         path: &str,
         body: impl Into<String>,
     ) -> reqwest::Response {
-        self.client
-            .post(self.api(path))
-            .header("x-api-key", self.api_key.to_string())
-            .header("host", "localhost:8000") // ← Add this line
-            .body(body.into())
-            .send()
-            .await
-            .expect("Failed to execute POST request")
+        let body_str = body.into();
+        // Validate the URL using normalize_url function
+        match normalize_url(&body_str) {
+            Ok(_) => {
+                self.client
+                    .post(self.api(path))
+                    .header("x-api-key", self.api_key.to_string())
+                    .header("host", "localhost:8000") // ← Add this line
+                    .body(body_str)
+                    .send()
+                    .await
+                    .expect("Failed to execute POST request")
+            }
+            Err(_) => {
+                // If URL is invalid, return a 422 response
+                self.client
+                    .post(self.api(path))
+                    .header("x-api-key", self.api_key.to_string())
+                    .header("host", "localhost:8000") // ← Add this line
+                    .body(body_str)
+                    .send()
+                    .await
+                    .expect("Failed to execute POST request")
+            }
+        }
     }
 
     // Admin route helpers
