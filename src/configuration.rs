@@ -37,17 +37,14 @@
 //!   create_if_missing: true
 //! ```
 
-use anyhow::{Context, Result, anyhow};
 use figment::{
     Figment,
     providers::{Env, Format, Yaml},
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
-use shuttle_runtime::SecretStore;
 use std::fmt;
 use uuid::Uuid;
-use url::Url;
 
 use crate::generator::config::ShortenerConfig;
 
@@ -317,34 +314,4 @@ pub fn get_configuration() -> Result<Settings, Box<figment::Error>> {
         .extract()?;
 
     Ok(settings)
-}
-
-// struct type to represent the Shuttle application configuration
-#[derive(Clone, Debug)]
-pub struct ShuttleAppConfig {
-    base_url: Url,
-}
-
-// methods to build the Shuttle configuration
-impl ShuttleAppConfig {
-    // accessor method for the `base_url` field
-    pub fn base_url(&self) -> &Url {
-        &self.base_url
-    }
-}
-
-// implement the TryFrom trait for the ShuttleAppConfig type
-impl TryFrom<&SecretStore> for ShuttleAppConfig {
-    type Error = anyhow::Error;
-
-    fn try_from(secrets: &SecretStore) -> Result<Self> {
-        let raw = secrets
-            .get("APP_BASEURL")
-            .ok_or_else(|| anyhow!("Missing required secret: APP_BASEURL"))?;
-
-        let base_url = Url::parse(&raw)
-            .with_context(|| format!("APP_BASEURL='{}' is not a valid URL", raw))?;
-
-        Ok(Self { base_url })
-    }
 }

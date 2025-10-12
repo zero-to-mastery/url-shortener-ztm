@@ -26,3 +26,6 @@ NUL
 
 # Shuttle
 Secrets*.toml
+
+# Snapshots
+/data

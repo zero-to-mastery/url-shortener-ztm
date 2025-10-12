@@ -1,0 +1,8 @@
+[build]
+assets = [
+  "configuration/base.yml",
+  "configuration/generator.yml",
+  "configuration/production.yml",
+  "static/*",
+  "templates/*"
+]
