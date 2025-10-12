@@ -2,7 +2,7 @@
 assets = [
   "configuration/base.yml",
   "configuration/generator.yml",
-  "configuration/production.yml",
+  "configuration/production.yaml",
   "static/*",
   "templates/*"
 ]
