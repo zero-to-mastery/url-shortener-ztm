@@ -53,8 +53,7 @@ use crate::database::{SqliteUrlDatabase, UrlDatabase};
 use crate::generator::build_generator;
 use crate::middleware::check_api_key;
 use crate::routes::{
-    get_admin_dashboard, get_current_user, get_index, get_login, get_redirect, get_register,
-    get_tags, get_user_profile, health_check, post_shorten, post_users_login, post_users_register,
+    get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile, health_check, post_shorten,
     serve_openapi_spec, serve_swagger_ui,
 };
 
@@ -520,12 +519,6 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .route("/admin/register", get(get_register))
         .route_layer(from_fn_with_state(state.clone(), check_api_key));
 
-    // RealWorld API routes (public for now; auth to be added later)
-    let realworld_routes = Router::new()
-        .route("/api/tags", get(get_tags))
-        .route("/api/users", post(post_users_register))
-        .route("/api/users/login", post(post_users_login))
-        .route("/api/user", get(get_current_user));
 
     // Merge all routes together
     let router = Router::new()
@@ -533,7 +526,6 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .merge(public_shorten)
         .merge(protected_api)
         .merge(protected_admin)
-        .merge(realworld_routes)
         .with_state(state)
         .layer(
             ServiceBuilder::new()

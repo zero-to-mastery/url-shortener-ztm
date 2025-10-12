@@ -49,7 +49,6 @@ pub mod admin;
 pub mod docs;
 pub mod health_check;
 pub mod index;
-pub mod realworld;
 pub mod redirect;
 pub mod shorten;
 
@@ -59,6 +58,5 @@ pub use docs::*;
 // Re-exports for convenience
 pub use health_check::*;
 pub use index::*;
-pub use realworld::*;
 pub use redirect::*;
 pub use shorten::*;
