@@ -124,7 +124,6 @@ async fn shorten_rejects_data_scheme() {
         .expect("Failed to parse JSON");
     assert_eq!(body.get("success").and_then(Value::as_bool), Some(false));
 }
-/// Test that file scheme is rejected
 
 /// Test that http and https URLs with more than two slashes after the colon are rejected
 #[tokio::test]
