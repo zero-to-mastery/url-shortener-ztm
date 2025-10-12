@@ -127,23 +127,59 @@ async fn shorten_rejects_data_scheme() {
 
 /// Test that http and https URLs with more than two slashes after the colon are rejected
 #[tokio::test]
-async fn shorten_rejects_http_https_with_extra_slashes() {
+async fn shorten_rejects_http_with_three_slashes() {
     let app = spawn_app().await;
-    let urls = vec![
-        "http:///example.com",   // three slashes
-        "https:////example.com", // four slashes
-        "http:/example.com",     // one slash
-        "https:/example.com",    // one slash
-    ];
-    for url in urls {
-        let response = app.post_api_with_key("/api/shorten", url).await;
-        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
-        let body = response
-            .json::<Value>()
-            .await
-            .expect("Failed to parse JSON");
-        assert_eq!(body.get("success").and_then(Value::as_bool), Some(false));
-    }
+    let response = app
+        .post_api_with_key("/api/shorten", "http:///example.com")
+        .await;
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = response
+        .json::<Value>()
+        .await
+        .expect("Failed to parse JSON");
+    assert_eq!(body.get("success").and_then(Value::as_bool), Some(false));
+}
+
+#[tokio::test]
+async fn shorten_rejects_https_with_four_slashes() {
+    let app = spawn_app().await;
+    let response = app
+        .post_api_with_key("/api/shorten", "https:////example.com")
+        .await;
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = response
+        .json::<Value>()
+        .await
+        .expect("Failed to parse JSON");
+    assert_eq!(body.get("success").and_then(Value::as_bool), Some(false));
+}
+
+#[tokio::test]
+async fn shorten_rejects_http_with_one_slash() {
+    let app = spawn_app().await;
+    let response = app
+        .post_api_with_key("/api/shorten", "http:/example.com")
+        .await;
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = response
+        .json::<Value>()
+        .await
+        .expect("Failed to parse JSON");
+    assert_eq!(body.get("success").and_then(Value::as_bool), Some(false));
+}
+
+#[tokio::test]
+async fn shorten_rejects_https_with_one_slash() {
+    let app = spawn_app().await;
+    let response = app
+        .post_api_with_key("/api/shorten", "https:/example.com")
+        .await;
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = response
+        .json::<Value>()
+        .await
+        .expect("Failed to parse JSON");
+    assert_eq!(body.get("success").and_then(Value::as_bool), Some(false));
 }
 /// Test that file scheme is rejected
 #[tokio::test]
