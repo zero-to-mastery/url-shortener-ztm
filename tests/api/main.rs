@@ -2,6 +2,7 @@
 
 mod admin;
 mod alias_validation_consistency;
+mod error_handling;
 mod health_check;
 mod helpers;
 mod rate_limiting;
