@@ -97,6 +97,12 @@
           openssl
           sqlx-cli
           sqlite
+          oha
+          nushell
+          postgresql
+          hey
+          just
+          k6
         ];
 
         # Convert ymal to JSON for environment preparation
