@@ -31,8 +31,8 @@ async fn post_shorten_with_alias(
         .expect("Failed to execute POST request")
 }
 
-/// Test that demonstrates the BUG: aliases containing underscore (_) are accepted
-/// but should be rejected according to the configuration
+/// Test that verifies aliases containing underscore (_) are rejected
+/// according to the configuration
 #[tokio::test]
 async fn bug_alias_with_underscore_is_incorrectly_accepted() {
     // Arrange
@@ -43,43 +43,34 @@ async fn bug_alias_with_underscore_is_incorrectly_accepted() {
     // Act - Try to create alias with underscore
     let response = post_shorten_with_alias(&app, alias_with_underscore, url).await;
 
-    // Assert - Currently returns 200 (BUG), should return 422
+    // Assert - Should return 422 (rejected)
     assert_eq!(
         response.status(),
-        StatusCode::OK,
-        "BUG: Alias with underscore is currently accepted but should be rejected"
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Alias with underscore should be rejected"
     );
 
-    // Verify the alias was created
+    // Verify the alias was rejected with appropriate error message
     let body_text = response.text().await.expect("Failed to read response body");
     let body: serde_json::Value =
         serde_json::from_str(&body_text).expect("Response should be valid JSON");
 
-    let data = body.get("data").expect("Response should have data field");
-    let shortened_url = data
-        .get("shortened_url")
-        .and_then(|v| v.as_str())
-        .expect("Response should have shortened_url field");
-
     assert!(
-        shortened_url.ends_with(alias_with_underscore),
-        "Shortened URL should end with the provided alias: {}",
-        shortened_url
+        body.get("success").and_then(|v| v.as_bool()) == Some(false),
+        "Response should indicate failure"
     );
 
-    // Now test if the alias can be accessed via redirect - this should fail
+    // Verify the alias cannot be accessed via redirect (since it was never created)
     let redirect_response = app.get(&format!("/{}", alias_with_underscore)).await;
-
-    // This demonstrates the inconsistency: alias was created but cannot be accessed
     assert_eq!(
         redirect_response.status(),
         StatusCode::NOT_FOUND,
-        "BUG: Alias with underscore cannot be accessed via redirect, demonstrating the inconsistency"
+        "Alias with underscore should not be accessible via redirect since it was rejected"
     );
 }
 
-/// Test that demonstrates the BUG: aliases containing hyphen (-) are accepted
-/// but should be rejected according to the configuration
+/// Test that verifies aliases containing hyphen (-) are rejected
+/// according to the configuration
 #[tokio::test]
 async fn bug_alias_with_hyphen_is_incorrectly_accepted() {
     // Arrange
@@ -90,38 +81,29 @@ async fn bug_alias_with_hyphen_is_incorrectly_accepted() {
     // Act - Try to create alias with hyphen
     let response = post_shorten_with_alias(&app, alias_with_hyphen, url).await;
 
-    // Assert - Currently returns 200 (BUG), should return 422
+    // Assert - Should return 422 (rejected)
     assert_eq!(
         response.status(),
-        StatusCode::OK,
-        "BUG: Alias with hyphen is currently accepted but should be rejected"
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Alias with hyphen should be rejected"
     );
 
-    // Verify the alias was created
+    // Verify the alias was rejected with appropriate error message
     let body_text = response.text().await.expect("Failed to read response body");
     let body: serde_json::Value =
         serde_json::from_str(&body_text).expect("Response should be valid JSON");
 
-    let data = body.get("data").expect("Response should have data field");
-    let shortened_url = data
-        .get("shortened_url")
-        .and_then(|v| v.as_str())
-        .expect("Response should have shortened_url field");
-
     assert!(
-        shortened_url.ends_with(alias_with_hyphen),
-        "Shortened URL should end with the provided alias: {}",
-        shortened_url
+        body.get("success").and_then(|v| v.as_bool()) == Some(false),
+        "Response should indicate failure"
     );
 
-    // Now test if the alias can be accessed via redirect - this should fail
+    // Verify the alias cannot be accessed via redirect (since it was never created)
     let redirect_response = app.get(&format!("/{}", alias_with_hyphen)).await;
-
-    // This demonstrates the inconsistency: alias was created but cannot be accessed
     assert_eq!(
         redirect_response.status(),
         StatusCode::NOT_FOUND,
-        "BUG: Alias with hyphen cannot be accessed via redirect, demonstrating the inconsistency"
+        "Alias with hyphen should not be accessible via redirect since it was rejected"
     );
 }
 
@@ -225,57 +207,48 @@ async fn validate_configuration_alphabet_usage() {
     );
 }
 
-/// Integration test that demonstrates the core bug: aliases with _ and - can be created
-/// but cannot be accessed via redirect due to character validation inconsistency
+/// Integration test that verifies aliases with _ and - are consistently rejected
+/// and cannot be accessed via redirect
 #[tokio::test]
 async fn demonstrate_core_bug_with_underscore_and_hyphen() {
     let url = "https://example.com";
 
-    // Test cases that demonstrate the specific bug with _ and - characters
-    let bug_test_cases = vec![("alias_with_underscore", '_'), ("alias-with-hyphen", '-')];
+    // Test cases that verify _ and - characters are consistently rejected
+    let test_cases = vec![("alias_with_underscore", '_'), ("alias-with-hyphen", '-')];
 
-    for (alias, _problematic_char) in bug_test_cases {
+    for (alias, _problematic_char) in test_cases {
         // Create a fresh app instance for each test case to avoid interference
         let app = spawn_app().await;
 
         // Try to create the alias
         let response = post_shorten_with_alias(&app, alias, url).await;
 
-        // BUG: Currently returns 200 instead of 422
+        // Should return 422 (rejected)
         assert_eq!(
             response.status(),
-            StatusCode::OK,
-            "BUG: Alias '{}' is currently accepted but should be rejected consistently",
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Alias '{}' should be rejected consistently",
             alias
         );
 
-        // Verify the alias was created (demonstrating the bug)
+        // Verify the alias was rejected with appropriate error message
         let body = response.text().await.expect("Failed to read response body");
         let body_json: serde_json::Value =
             serde_json::from_str(&body).expect("Response should be valid JSON");
 
-        let data = body_json
-            .get("data")
-            .expect("Response should have data field");
-        let shortened_url = data
-            .get("shortened_url")
-            .and_then(|v| v.as_str())
-            .expect("Response should have shortened_url field");
-
         assert!(
-            shortened_url.ends_with(alias),
-            "BUG: Alias '{}' was created but should have been rejected, shortened_url: {}",
-            alias,
-            shortened_url
+            body_json.get("success").and_then(|v| v.as_bool()) == Some(false),
+            "Response should indicate failure for alias '{}'",
+            alias
         );
 
-        // Test if the alias can be accessed via redirect - this should fail due to character validation inconsistency
+        // Test if the alias can be accessed via redirect - this should fail since it was never created
         let redirect_response = app.get(&format!("/{}", alias)).await;
 
         assert_eq!(
             redirect_response.status(),
             StatusCode::NOT_FOUND,
-            "BUG: Alias '{}' cannot be accessed via redirect, demonstrating the inconsistency",
+            "Alias '{}' should not be accessible via redirect since it was rejected",
             alias
         );
     }
