@@ -204,7 +204,7 @@ pub async fn post_shorten(
 
     // 4) Insert path: use custom alias if provided, otherwise generate with retries
     let id = if let Some(alias) = params.alias.as_deref() {
-        validate_alias(alias)?;
+        validate_alias(alias, &state)?;
         match state.database.insert_url(alias, &norm).await {
             Ok(()) => alias.to_string(),
             Err(DatabaseError::Duplicate) => {
@@ -319,8 +319,8 @@ fn make_response(hostname: &str, id: &str, original_url: &str) -> ApiResponse<Sh
 /// Rules:
 /// - Non-empty
 /// - Max length = MAX_ALIAS_LENGTH
-/// - Allowed characters: A-Z, a-z, 0-9, underscore, hyphen
-fn validate_alias(alias: &str) -> Result<(), ApiError> {
+/// - Allowed characters: based on configuration (state.allowed_chars)
+fn validate_alias(alias: &str, state: &AppState) -> Result<(), ApiError> {
     if alias.is_empty() {
         return Err(ApiError::Unprocessable("Alias cannot be empty".to_string()));
     }
@@ -331,12 +331,9 @@ fn validate_alias(alias: &str) -> Result<(), ApiError> {
         )));
     }
 
-    let is_allowed = alias
-        .chars()
-        .all(|ch| matches!(ch, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | '-'));
-    if !is_allowed {
+    if alias.chars().any(|c| !state.allowed_chars.contains(&c)) {
         return Err(ApiError::Unprocessable(
-            "Alias may contain only A-Z, a-z, 0-9, _ and -".to_string(),
+            "Alias contains characters not allowed by configuration".to_string(),
         ));
     }
 
