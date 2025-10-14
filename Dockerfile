@@ -1,5 +1,5 @@
 # Use the official Rust image as the base image for building
-FROM rust:1.82-slim AS builder
+FROM rust:1.90-slim AS builder
 
 # Install required packages for building
 RUN apt-get update && apt-get install -y \
@@ -12,6 +12,9 @@ WORKDIR /app
 
 # Copy the Cargo.toml and Cargo.lock files
 COPY Cargo.toml Cargo.lock ./
+
+# Copy openapi.yaml before building
+COPY openapi.yaml ./openapi.yaml
 
 # Copy the source code
 COPY src ./src
@@ -54,6 +57,9 @@ RUN chown -R app:app /app
 
 # Switch to the non-root user
 USER app
+
+# Set environment to production (uses configuration/production.yml)
+ENV APP_ENVIRONMENT=production
 
 # Expose the port the app runs on
 EXPOSE 8000
