@@ -182,7 +182,11 @@ pub async fn post_shorten(
         ApiError::Unprocessable(e.to_string())
     })?;
 
-    let hostname = header.hostname();
+    let hostname = format!(
+        "{}{}",
+        header.hostname(),
+        header.port().map_or("".to_string(), |p| format!(":{}", p))
+    );
 
     // 3) Fast path: check Bloom filter (long → short).
     // If it may exist, verify with the database.
@@ -190,7 +194,7 @@ pub async fn post_shorten(
         match state.database.get_id_by_url(&norm).await {
             Ok(existing_id) => {
                 tracing::info!("Hit existing mapping via bloom+db");
-                return Ok(make_response(hostname, &existing_id, &norm));
+                return Ok(make_response(&hostname, &existing_id, &norm));
             }
             Err(DatabaseError::NotFound) => {
                 // False positive; proceed to insertion path.
@@ -224,7 +228,7 @@ pub async fn post_shorten(
     state.blooms.l2s.insert(norm.as_str());
 
     tracing::info!("URL shortened and saved successfully");
-    Ok(make_response(hostname, &id, &norm))
+    Ok(make_response(&hostname, &id, &norm))
 }
 
 /// Parses and normalizes a URL:

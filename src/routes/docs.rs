@@ -84,6 +84,7 @@ pub async fn serve_swagger_ui() -> Html<String> {
 <body>
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui-bundle.js" crossorigin></script>
+     <script src="https://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui-standalone-preset.js" crossorigin></script>
     <script>
         window.onload = () => {
             window.ui = SwaggerUIBundle({
@@ -92,7 +93,7 @@ pub async fn serve_swagger_ui() -> Html<String> {
                 deepLinking: true,
                 presets: [
                     SwaggerUIBundle.presets.apis,
-                    SwaggerUIBundle.presets.standalone
+                    SwaggerUIStandalonePreset
                 ],
                 plugins: [
                     SwaggerUIBundle.plugins.DownloadUrl
