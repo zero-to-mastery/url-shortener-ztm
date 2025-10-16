@@ -660,18 +660,21 @@ footer::before {
 
 /* Admin Panel Styles */
 .admin-panel {
-  display: grid;
-  grid-template-columns: 250px 1fr;
-  gap: 2rem;
-  margin: 2rem 0;
+  display: flex;
 }
 
 .admin-nav {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: 250px;
   background: var(--surface);
-  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
   padding: 1.5rem;
-  box-shadow: var(--shadow);
-  height: fit-content;
+  overflow-y: auto;
+  z-index: 1000;
+  transition: transform 0.3s ease-in-out;
 }
 
 .admin-nav h3 {
@@ -705,11 +708,67 @@ footer::before {
 }
 
 .admin-content {
-  background: var(--surface);
-  border-radius: var(--radius);
+  margin-left: 250px;
+  flex: 1;
   padding: 2rem;
-  box-shadow: var(--shadow);
 }
+.hamburger {
+  display: none;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  background: #1e293b;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 1.4rem;
+  cursor: pointer;
+  z-index: 999;
+  transition: background 0.3s ease;
+}
+
+.hamburger:hover {
+  background: #334155; /* lighter navy */
+}
+
+/* Mobile view */
+@media (max-width: 768px) {
+  .hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .admin-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transform: translateX(-100%);
+  }
+
+  .admin-nav.open {
+    transform: translateX(0);
+  }
+
+  .admin-content {
+    padding-top: 4rem;
+  }
+}
+
+/* Sidebar transition for smoother open/close */
+.admin-sidebar {
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.admin-sidebar.open {
+  transform: translateX(0);
+  box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+}
+
+
+
 
 .stats-grid {
   display: grid;
@@ -724,6 +783,12 @@ footer::before {
   padding: 1.5rem;
   border-radius: var(--radius);
   text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
 }
 
 .stat-card h4 {
@@ -750,10 +815,15 @@ footer::before {
 }
 
 .admin-actions {
-  margin-top: 2rem;
+    position: fixed;
+  bottom: 0;
+  left: 57%;
+  transform: translateX(-50%);
   display: flex;
   gap: 1rem;
   justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
 }
 
 /* Profile Styles */
@@ -1038,39 +1108,19 @@ footer::before {
 
 /* Responsive Design for Admin */
 @media (max-width: 768px) {
-  .admin-panel {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-  
   .admin-nav {
-    order: 2;
+    transform: translateX(-100%);
   }
-  
+  .admin-nav.open {
+    transform: translateX(0);
+  }
+
   .admin-content {
-    order: 1;
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .profile-section {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-  
-  .url-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-  
-  .auth-card {
-    margin: 1rem;
-    padding: 1.5rem;
+    margin-left: 0;
+    padding-top: 4rem;
   }
 }
+ 
 
 @media (max-width: 480px) {
   .stats-grid {

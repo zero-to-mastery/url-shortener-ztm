@@ -179,3 +179,30 @@ function isValidUrl(string) {
     return false;
   }
 }
+
+
+// Admin sidebar toggle
+  const hamburger = document.getElementById("hamburger");
+  const sidebar = document.getElementById("adminNav");
+  const content = document.getElementById("adminContent");
+
+  // Toggle sidebar open/close
+  hamburger.addEventListener("click", (e) => {
+    e.stopPropagation(); // Prevent event from bubbling up
+    sidebar.classList.toggle("open");
+    hamburger.classList.toggle("active");
+    hamburger.textContent = sidebar.classList.contains("open") ? "✕" : "☰";
+  });
+
+  // Close sidebar when clicking outside
+  document.addEventListener("click", (e) => {
+    if (
+      sidebar.classList.contains("open") &&
+      !sidebar.contains(e.target) &&
+      !hamburger.contains(e.target)
+    ) {
+      sidebar.classList.remove("open");
+      hamburger.classList.remove("active");
+      hamburger.textContent = "☰";
+    }
+  });
