@@ -1,6 +1,19 @@
 application:
   port: 8000
   host: 0.0.0.0
+  # WARNING: This is a development-only API key. It is intentionally predictable
+  # and must NEVER be used in production. The application will emit a runtime
+  # warning if this default key is detected.
+  #
+  # To set a secure key:
+  # - Prefer environment variables in all non-local environments
+  #   APP_APPLICATION__API_KEY=<uuid-v4>
+  # - Generate a UUID v4 (examples):
+  #   - Linux/macOS: uuidgen
+  #   - PowerShell: [guid]::NewGuid()
+  #   - Rust (one-off): cargo run --bin print-uuid (see README)
+  #
+  # Note: Keeping this default ensures `cargo run` works out of the box locally.
   api_key: "e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5"
   templates: "templates/**/*"
 database:
