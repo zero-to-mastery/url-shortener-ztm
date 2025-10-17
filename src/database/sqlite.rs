@@ -49,7 +49,7 @@
 
 use super::{DatabaseError, UrlDatabase};
 use crate::configuration::DatabaseSettings;
-use crate::models::UrlRecord;
+use crate::models::{UpsertResult, Urls};
 use async_trait::async_trait;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 use std::str::FromStr;
@@ -186,15 +186,17 @@ impl SqliteUrlDatabase {
 #[async_trait]
 impl UrlDatabase for SqliteUrlDatabase {
     /// Retrieves the short ID by original URL from the SQLite database.
-    async fn get_id_by_url(&self, url: &str) -> Result<String, DatabaseError> {
-        let row = sqlx::query_as::<_, (String,)>("SELECT id FROM urls WHERE url = ?")
-            .bind(url)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    async fn get_id_by_url(&self, url: &str) -> Result<Urls, DatabaseError> {
+        let row = sqlx::query_as::<_, Urls>(
+            "SELECT id FROM urls WHERE url_hash = digest(?, 'sha256') LIMIT 1",
+        )
+        .bind(url)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
         match row {
-            Some(record) => Ok(record.0),
+            Some(record) => Ok(record),
             None => Err(DatabaseError::NotFound),
         }
     }
@@ -227,21 +229,35 @@ impl UrlDatabase for SqliteUrlDatabase {
     /// # Ok(())
     /// # }
     /// ```
-    async fn insert_url(&self, id: &str, url: &str) -> Result<(), DatabaseError> {
-        sqlx::query("INSERT INTO urls (id, url) VALUES (?, ?)")
-            .bind(id)
-            .bind(url)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                if e.to_string().contains("UNIQUE constraint failed") {
-                    DatabaseError::Duplicate
-                } else {
-                    DatabaseError::QueryError(e.to_string())
-                }
-            })?;
-
-        Ok(())
+    async fn insert_url(&self, id: &str, url: &str) -> Result<UpsertResult, DatabaseError> {
+        sqlx::query_as::<_, UpsertResult>(
+            r#"
+                     WITH ins AS (
+                          INSERT INTO urls (code, url)
+                          VALUES ($1, $2)
+                          ON CONFLICT (url_hash) DO NOTHING
+                          RETURNING id
+                        )
+                        SELECT id, TRUE AS created FROM ins
+                        UNION ALL
+                        SELECT u.id, FALSE AS created
+                        FROM urls u
+                        WHERE u.url_hash = digest($2, 'sha256')
+                          AND NOT EXISTS (SELECT 1 FROM ins)
+                        LIMIT 1;
+                    "#,
+        )
+        .bind(id)
+        .bind(url)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| {
+            if e.to_string().contains("UNIQUE constraint failed") {
+                DatabaseError::Duplicate
+            } else {
+                DatabaseError::QueryError(e.to_string())
+            }
+        })
     }
 
     /// Retrieves a URL by its short ID from the SQLite database.
@@ -290,16 +306,20 @@ impl UrlDatabase for SqliteUrlDatabase {
         &self,
         offset: u64,
         limit: u64,
-    ) -> Result<Vec<UrlRecord>, DatabaseError> {
-        let records =
-            sqlx::query_as::<_, UrlRecord>("SELECT id, url FROM urls ORDER BY id LIMIT ? OFFSET ?")
+    ) -> Result<Vec<String>, DatabaseError> {
+        let codes: Vec<String> =
+            sqlx::query_scalar("SELECT short_code FROM all_short_codes LIMIT ? OFFSET ?")
                 .bind(limit as i64)
                 .bind(offset as i64)
                 .fetch_all(&self.pool)
                 .await
                 .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-        Ok(records)
+        Ok(codes)
+    }
+
+    async fn insert_alias(&self, _alias_code: &str, _code_id: i64) -> Result<(), DatabaseError> {
+        todo!()
     }
 }
 

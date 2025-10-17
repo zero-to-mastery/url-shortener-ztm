@@ -371,9 +371,6 @@ impl Application {
                 if let Err(err) = blooms.s2l.save_to_file_with_hashes(S2L_SNAPSHOT) {
                     tracing::warn!(%err, "failed to persist s2l Bloom snapshot on shutdown");
                 }
-                if let Err(err) = blooms.l2s.save_to_file_with_hashes(L2S_SNAPSHOT) {
-                    tracing::warn!(%err, "failed to persist l2s Bloom snapshot on shutdown");
-                }
                 tracing::info!("Bloom snapshots saved on shutdown.");
             }
         })

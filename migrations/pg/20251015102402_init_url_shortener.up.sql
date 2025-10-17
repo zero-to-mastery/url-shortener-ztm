@@ -1,4 +1,5 @@
 -- Add up migration script here
+-- Add up migration script here
 
 SET search_path TO public;
 

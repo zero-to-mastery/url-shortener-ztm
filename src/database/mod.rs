@@ -51,9 +51,11 @@ pub mod postgres_sql;
 pub mod sqlite;
 
 // Re-exports for convenience
-use crate::models::UrlRecord;
+use crate::models::{UpsertResult, Urls};
 pub use postgres_sql::PostgresUrlDatabase;
 pub use sqlite::*;
+
+pub const MAX_ALIAS_LENGTH: usize = 64;
 
 /// Database operation errors.
 ///
@@ -139,8 +141,9 @@ pub trait UrlDatabase: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    async fn insert_url(&self, id: &str, url: &str) -> Result<(), DatabaseError>;
-    async fn get_id_by_url(&self, url: &str) -> Result<String, DatabaseError>;
+    async fn insert_url(&self, code: &str, url: &str) -> Result<UpsertResult, DatabaseError>;
+    async fn insert_alias(&self, alias_code: &str, code_id: i64) -> Result<(), DatabaseError>;
+    async fn get_id_by_url(&self, url: &str) -> Result<Urls, DatabaseError>;
 
     /// Retrieves a URL by its short ID from the database.
     ///
@@ -167,9 +170,6 @@ pub trait UrlDatabase: Send + Sync {
     /// # }
     /// ```
     async fn get_url(&self, id: &str) -> Result<String, DatabaseError>;
-    async fn list_short_codes(
-        &self,
-        offset: u64,
-        limit: u64,
-    ) -> Result<Vec<UrlRecord>, DatabaseError>;
+    async fn list_short_codes(&self, offset: u64, limit: u64)
+    -> Result<Vec<String>, DatabaseError>;
 }

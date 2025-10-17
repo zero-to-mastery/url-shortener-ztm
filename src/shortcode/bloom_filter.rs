@@ -109,7 +109,7 @@ pub async fn build_bloom_pair(db: &Arc<dyn UrlDatabase>) -> Result<BloomPair> {
 
     // First-time build: pull data from DB in pages
     let mut shorts: Vec<Vec<u8>> = Vec::new();
-    let mut longs: Vec<Vec<u8>> = Vec::new();
+    let longs: Vec<Vec<u8>> = Vec::new();
 
     let mut offset: u64 = 0;
 
@@ -119,8 +119,8 @@ pub async fn build_bloom_pair(db: &Arc<dyn UrlDatabase>) -> Result<BloomPair> {
             break;
         }
         for rec in &batch {
-            shorts.push(rec.id.as_bytes().to_vec());
-            longs.push(rec.url.as_bytes().to_vec());
+            shorts.push(rec.as_bytes().to_vec());
+            // longs.push(rec.url.as_bytes().to_vec());
         }
         offset += batch.len() as u64;
         if batch.len() < PAGE as usize {

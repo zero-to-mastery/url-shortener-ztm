@@ -25,7 +25,7 @@ NUL
 .pre-commit-config.yaml
 
 # Snapshots
-/data
+data
 
 # Shuttle
 .shuttle

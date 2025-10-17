@@ -13,7 +13,7 @@ def main [
 
   # Load config & original data
   let cfg = open $config_path
-  let orig_list = (open $input_path | get id)
+  let orig_list = (open $input_path | get code)
   let orig_count = ($orig_list | length)
   if $orig_count == 0 {
     error make { msg: $"No 'id' field found or file is empty: ($input_path)" }
@@ -22,7 +22,7 @@ def main [
   # Calculate number to generate
   let pct_decimal = ($pct | into float | $in / 100)
   let add_count = (if $pct_decimal == 1 {
-      error make { msg: "pct cannot be 100 😅" }
+      error make { msg: "pct cannot be 100" }
   } else {
       ($orig_count * $pct_decimal) / (1 - $pct_decimal)
   } | math round)

@@ -57,7 +57,7 @@
 
 use super::{DatabaseError, UrlDatabase};
 use crate::configuration::DatabaseSettings;
-use crate::models::UrlRecord;
+use crate::models::{UpsertResult, Urls};
 use async_trait::async_trait;
 use sqlx::{
     Error as SqlxError, PgPool,
@@ -176,14 +176,17 @@ impl PostgresUrlDatabase {
 #[async_trait]
 impl UrlDatabase for PostgresUrlDatabase {
     /// Retrieves the short ID by original URL from the PostgreSQL database.
-    async fn get_id_by_url(&self, url: &str) -> Result<String, DatabaseError> {
-        let row = sqlx::query_as::<_, (String,)>("SELECT id FROM urls WHERE url = $1")
-            .bind(url)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    async fn get_id_by_url(&self, url: &str) -> Result<Urls, DatabaseError> {
+        let row = sqlx::query_as::<_, Urls>(
+            "SELECT id, code FROM urls WHERE url_hash = digest($1, 'sha256') LIMIT 1",
+        )
+        .bind(url)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
         match row {
-            Some(record) => Ok(record.0),
+            Some(record) => Ok(record),
             None => Err(DatabaseError::NotFound),
         }
     }
@@ -196,11 +199,11 @@ impl UrlDatabase for PostgresUrlDatabase {
     ///
     /// * `id` - The short identifier for the URL
     /// * `url` - The original URL to store
-    async fn insert_url(&self, id: &str, url: &str) -> Result<(), DatabaseError> {
-        sqlx::query("INSERT INTO urls (id, url) VALUES ($1, $2)")
-            .bind(id)
+    async fn insert_url(&self, code: &str, url: &str) -> Result<UpsertResult, DatabaseError> {
+        sqlx::query_as::<_, UpsertResult>("SELECT * FROM upsert_url($1, $2)")
+            .bind(code)
             .bind(url)
-            .execute(&self.pool)
+            .fetch_one(&self.pool)
             .await
             .map_err(|e| {
                 if is_unique_violation(&e) {
@@ -208,8 +211,7 @@ impl UrlDatabase for PostgresUrlDatabase {
                 } else {
                     DatabaseError::QueryError(e.to_string())
                 }
-            })?;
-        Ok(())
+            })
     }
 
     /// Retrieves a URL by its short ID from the PostgreSQL database.
@@ -225,12 +227,14 @@ impl UrlDatabase for PostgresUrlDatabase {
     ///
     /// Returns `Ok(String)` with the original URL if found, or
     /// `Err(DatabaseError::NotFound)` if no record exists.
-    async fn get_url(&self, id: &str) -> Result<String, DatabaseError> {
-        let row = sqlx::query_as::<_, (String,)>("SELECT url FROM urls WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    async fn get_url(&self, code: &str) -> Result<String, DatabaseError> {
+        let row = sqlx::query_as::<_, (String,)>(
+            "SELECT url FROM all_short_codes u WHERE u.code = $1 LIMIT 1;",
+        )
+        .bind(code)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
         match row {
             Some(record) => Ok(record.0),
@@ -242,17 +246,32 @@ impl UrlDatabase for PostgresUrlDatabase {
         &self,
         offset: u64,
         limit: u64,
-    ) -> Result<Vec<UrlRecord>, DatabaseError> {
-        let records = sqlx::query_as::<_, UrlRecord>(
-            "SELECT id, url FROM urls ORDER BY id LIMIT $1 OFFSET $2",
-        )
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    ) -> Result<Vec<String>, DatabaseError> {
+        let codes: Vec<String> =
+            sqlx::query_scalar("SELECT code FROM all_short_codes LIMIT $1 OFFSET $2")
+                .bind(limit as i64)
+                .bind(offset as i64)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-        Ok(records)
+        Ok(codes)
+    }
+
+    async fn insert_alias(&self, alias_code: &str, code_id: i64) -> Result<(), DatabaseError> {
+        sqlx::query("INSERT INTO aliases (alias, target_id) VALUES ($1, $2)")
+            .bind(alias_code)
+            .bind(code_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                if is_unique_violation(&e) {
+                    DatabaseError::Duplicate
+                } else {
+                    DatabaseError::QueryError(e.to_string())
+                }
+            })?;
+        Ok(())
     }
 }
 
