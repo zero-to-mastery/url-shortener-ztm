@@ -4,3 +4,4 @@ CREATE TABLE urls (
     id TEXT PRIMARY KEY,
     url TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_ulrs_url ON urls(url);

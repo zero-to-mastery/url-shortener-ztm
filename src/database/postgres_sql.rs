@@ -286,7 +286,11 @@ impl UrlDatabase for PostgresUrlDatabase {
 /// ```
 pub async fn get_connection_pool(config: &DatabaseSettings) -> Result<PgPool, SqlxError> {
     let options = PgConnectOptions::from_str(&config.connection_string())?;
-    PgPoolOptions::new().connect_with(options).await
+    PgPoolOptions::new()
+        .max_connections(64)
+        .min_connections(16)
+        .connect_with(options)
+        .await
 }
 
 // ---- helpers ----
