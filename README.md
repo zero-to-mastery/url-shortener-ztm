@@ -245,6 +245,39 @@ APP_APPLICATION__API_KEY=your-new-api-key
 APP_DATABASE__DATABASE_PATH=./my-database.db
 ```
 
+### API Key Security
+
+The service protects write endpoints with a UUID-based API key.
+
+- The base config includes an **obviously insecure development key** so `cargo run` works out of the box.
+- On startup, the app detects this default key and prints a prominent warning to the console.
+- In any non-local environment, you MUST override the key via environment variable.
+
+Generate a UUID v4:
+
+```bash
+# Linux/macOS
+uuidgen
+
+# PowerShell
+[guid]::NewGuid()
+
+# Rust (optional helper):
+cargo run --bin print-uuid
+```
+
+Set the key via env var:
+
+```bash
+APP_APPLICATION__API_KEY=$(uuidgen)
+```
+
+Production guidance:
+
+- Store secrets in your platform’s secret manager (e.g., Fly.io, Railway, Kubernetes, GitHub Actions).
+- Rotate keys when compromised or on developer offboarding.
+- Never commit real keys to version control.
+
 #### Database Configuration
 
 **SQLite Configuration (Default)**

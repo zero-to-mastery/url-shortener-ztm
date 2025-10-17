@@ -24,6 +24,7 @@
 use url_shortener_ztm_lib::configuration::get_configuration;
 use url_shortener_ztm_lib::startup::Application;
 use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
+use uuid::Uuid;
 
 /// Main function - the application entry point.
 ///
@@ -51,6 +52,28 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Reading configuration...");
     let configuration = get_configuration().expect("Failed to read configuration files.");
     tracing::info!(%configuration, "Configuration loaded");
+
+    // Detect default development API key and emit a prominent warning
+    // This warns developers if they are accidentally using the insecure default key.
+    let default_dev_key = Uuid::parse_str("e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5").unwrap();
+    if configuration.application.api_key == default_dev_key {
+        // Use a big banner to make this stand out in logs
+        tracing::warn!(
+            "\n============================================================\n\
+            SECURITY WARNING: USING DEFAULT DEVELOPMENT API KEY\n\
+            ----------------------------------------------------\n\
+            The configured API key matches the development default.\n\
+            This key is PUBLIC and MUST NOT be used in production.\n\
+\n\
+            To set a secure key (UUID v4):\n\
+              - env var: APP_APPLICATION__API_KEY=<uuid-v4>\n\
+              - generate: `uuidgen` (Linux/macOS) or `[guid]::NewGuid()` (PowerShell)\n\
+\n\
+            Current environment: {env}\n\
+============================================================",
+            env = std::env::var("APP_ENVIRONMENT").unwrap_or_else(|_| "local".into())
+        );
+    }
 
     // Build the application with database connection and router setup
     tracing::info!("Starting up the application...");
