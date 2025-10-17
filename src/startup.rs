@@ -357,14 +357,29 @@ impl Application {
     /// # }
     /// ```
     pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
+        let blooms = self.state.blooms.clone();
+
         axum::serve(
             self.listener,
             self.router
                 .into_make_service_with_connect_info::<std::net::SocketAddr>(),
         )
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(async move {
+            shutdown_signal().await;
+
+            if not_disable_bf_snapshots() {
+                if let Err(err) = blooms.s2l.save_to_file_with_hashes(S2L_SNAPSHOT) {
+                    tracing::warn!(%err, "failed to persist s2l Bloom snapshot on shutdown");
+                }
+                if let Err(err) = blooms.l2s.save_to_file_with_hashes(L2S_SNAPSHOT) {
+                    tracing::warn!(%err, "failed to persist l2s Bloom snapshot on shutdown");
+                }
+                tracing::info!("Bloom snapshots saved on shutdown.");
+            }
+        })
         .await
         .context("Unable to start the app server...")?;
+
         Ok(())
     }
 }
