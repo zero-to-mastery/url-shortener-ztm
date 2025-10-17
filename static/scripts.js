@@ -50,8 +50,12 @@ class UrlShortener {
       this.retryBtn.addEventListener("click", () => this.clearResults());
     }
 
-    document.getElementById("closeResult")?.addEventListener("click", () => this.clearResults());
-    document.getElementById("closeError")?.addEventListener("click", () => this.clearResults());
+    document
+      .getElementById("closeResult")
+      ?.addEventListener("click", () => this.clearResults());
+    document
+      .getElementById("closeError")
+      ?.addEventListener("click", () => this.clearResults());
 
     this.urlInput.addEventListener("input", () => this.clearResults());
     document.addEventListener("keydown", (e) => {
@@ -69,11 +73,10 @@ class UrlShortener {
     this.clearResults();
 
     try {
-      const response = await fetch("/api/shorten", {
+      const response = await fetch("/api/public/shorten", {
         method: "POST",
         headers: {
           "Content-Type": "text/plain",
-          "X-API-Key": "e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5",
         },
         body: url,
       });
@@ -83,11 +86,11 @@ class UrlShortener {
         if (jsonResponse.success && jsonResponse.data) {
           this.showResult(
             jsonResponse.data.original_url,
-            jsonResponse.data.shortened_url
+            jsonResponse.data.shortened_url,
           );
         } else {
           this.showError(
-            `Failed to shorten URL: ${jsonResponse.message || "Unknown error"}`
+            `Failed to shorten URL: ${jsonResponse.message || "Unknown error"}`,
           );
         }
       } else {
@@ -180,29 +183,28 @@ function isValidUrl(string) {
   }
 }
 
-
 // Admin sidebar toggle
-  const hamburger = document.getElementById("hamburger");
-  const sidebar = document.getElementById("adminNav");
-  const content = document.getElementById("adminContent");
+const hamburger = document.getElementById("hamburger");
+const sidebar = document.getElementById("adminNav");
+const content = document.getElementById("adminContent");
 
-  // Toggle sidebar open/close
-  hamburger.addEventListener("click", (e) => {
-    e.stopPropagation(); // Prevent event from bubbling up
-    sidebar.classList.toggle("open");
-    hamburger.classList.toggle("active");
-    hamburger.textContent = sidebar.classList.contains("open") ? "✕" : "☰";
-  });
+// Toggle sidebar open/close
+hamburger.addEventListener("click", (e) => {
+  e.stopPropagation(); // Prevent event from bubbling up
+  sidebar.classList.toggle("open");
+  hamburger.classList.toggle("active");
+  hamburger.textContent = sidebar.classList.contains("open") ? "✕" : "☰";
+});
 
-  // Close sidebar when clicking outside
-  document.addEventListener("click", (e) => {
-    if (
-      sidebar.classList.contains("open") &&
-      !sidebar.contains(e.target) &&
-      !hamburger.contains(e.target)
-    ) {
-      sidebar.classList.remove("open");
-      hamburger.classList.remove("active");
-      hamburger.textContent = "☰";
-    }
-  });
+// Close sidebar when clicking outside
+document.addEventListener("click", (e) => {
+  if (
+    sidebar.classList.contains("open") &&
+    !sidebar.contains(e.target) &&
+    !hamburger.contains(e.target)
+  ) {
+    sidebar.classList.remove("open");
+    hamburger.classList.remove("active");
+    hamburger.textContent = "☰";
+  }
+});
