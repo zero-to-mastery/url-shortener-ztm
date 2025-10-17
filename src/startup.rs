@@ -516,8 +516,8 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .route("/admin", get(get_admin_dashboard))
         .route("/admin/profile", get(get_user_profile))
         .route("/admin/login", get(get_login))
-        .route("/admin/register", get(get_register))
-        .route_layer(from_fn_with_state(state.clone(), check_api_key));
+        .route("/admin/register", get(get_register));
+    // TODO: Add session-based auth middleware once implemented
 
     // Merge all routes together
     let router = Router::new()

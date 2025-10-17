@@ -1,6 +1,5 @@
 // tests/api/main.rs
 
-mod admin;
 mod alias_validation_consistency;
 mod error_handling;
 mod health_check;

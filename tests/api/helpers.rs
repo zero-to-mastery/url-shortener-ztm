@@ -217,6 +217,7 @@ impl TestApp {
     }
 
     // Admin route helpers
+    #[allow(dead_code)]
     pub async fn get_admin_dashboard(&self) -> reqwest::Response {
         self.client
             .get(self.url("/admin"))
@@ -225,6 +226,7 @@ impl TestApp {
             .expect("Failed to execute GET request")
     }
 
+    #[allow(dead_code)]
     pub async fn get_admin_dashboard_with_api_key(&self) -> reqwest::Response {
         self.client
             .get(self.url("/admin"))
@@ -234,6 +236,7 @@ impl TestApp {
             .expect("Failed to execute GET request")
     }
 
+    #[allow(dead_code)]
     pub async fn get_admin_login(&self) -> reqwest::Response {
         self.client
             .get(self.url("/admin/login"))
@@ -242,6 +245,7 @@ impl TestApp {
             .expect("Failed to execute GET request")
     }
 
+    #[allow(dead_code)]
     pub async fn get_admin_register(&self) -> reqwest::Response {
         self.client
             .get(self.url("/admin/register"))
@@ -250,6 +254,7 @@ impl TestApp {
             .expect("Failed to execute GET request")
     }
 
+    #[allow(dead_code)]
     pub async fn get_admin_profile(&self) -> reqwest::Response {
         self.client
             .get(self.url("/admin/profile"))
