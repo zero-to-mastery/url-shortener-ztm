@@ -58,7 +58,7 @@ use crate::routes::{
 };
 
 use crate::shortcode::bloom_filter::{
-    L2S_SNAPSHOT, S2L_SNAPSHOT, build_bloom_pair, not_disable_bf_snapshots,
+    S2L_SNAPSHOT_KEY, build_bloom_state, not_disable_bf_snapshots,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
@@ -249,7 +249,7 @@ impl Application {
             set
         };
 
-        let blooms = build_bloom_pair(&database).await.unwrap();
+        let blooms = build_bloom_state(&database).await.unwrap();
 
         // Set up the TCP listener and application state
         let api_key = config.application.api_key;
@@ -275,19 +275,28 @@ impl Application {
             .context("Failed to create the application router.")?;
 
         let blooms = state.blooms.clone();
+        let bloom_db = state.database.clone();
 
         if not_disable_bf_snapshots() {
             tokio::spawn(async move {
                 let mut ticker = tokio::time::interval(Duration::from_secs(60 * 5)); // 5min
                 loop {
                     ticker.tick().await;
-                    if let Err(err) = blooms.s2l.save_to_file_with_hashes(S2L_SNAPSHOT) {
+                    let snapshot = match blooms.s2l.snapshot() {
+                        Ok(bytes) => bytes,
+                        Err(err) => {
+                            tracing::warn!(error = %err, "unable to serialize s2l Bloom snapshot");
+                            continue;
+                        }
+                    };
+                    if let Err(err) = bloom_db
+                        .save_bloom_snapshot(S2L_SNAPSHOT_KEY, &snapshot)
+                        .await
+                    {
                         tracing::warn!(error = %err, "failed to persist s2l Bloom snapshot");
+                        continue;
                     }
-                    if let Err(err) = blooms.l2s.save_to_file_with_hashes(L2S_SNAPSHOT) {
-                        tracing::warn!(error = %err, "failed to persist l2s Bloom snapshot");
-                    }
-                    tracing::info!("Bloom snapshots saved.");
+                    tracing::info!("Bloom snapshot saved to database.");
                 }
             });
         }
@@ -358,6 +367,7 @@ impl Application {
     /// ```
     pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
         let blooms = self.state.blooms.clone();
+        let bloom_db = self.state.database.clone();
 
         axum::serve(
             self.listener,
@@ -368,10 +378,26 @@ impl Application {
             shutdown_signal().await;
 
             if not_disable_bf_snapshots() {
-                if let Err(err) = blooms.s2l.save_to_file_with_hashes(S2L_SNAPSHOT) {
-                    tracing::warn!(%err, "failed to persist s2l Bloom snapshot on shutdown");
+                match blooms.s2l.snapshot() {
+                    Ok(bytes) => {
+                        if let Err(err) =
+                            bloom_db.save_bloom_snapshot(S2L_SNAPSHOT_KEY, &bytes).await
+                        {
+                            tracing::warn!(
+                                %err,
+                                "failed to persist s2l Bloom snapshot on shutdown"
+                            );
+                        } else {
+                            tracing::info!("Bloom snapshot saved on shutdown.");
+                        }
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            %err,
+                            "unable to serialize s2l Bloom snapshot on shutdown"
+                        );
+                    }
                 }
-                tracing::info!("Bloom snapshots saved on shutdown.");
             }
         })
         .await

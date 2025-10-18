@@ -172,4 +172,6 @@ pub trait UrlDatabase: Send + Sync {
     async fn get_url(&self, id: &str) -> Result<String, DatabaseError>;
     async fn list_short_codes(&self, offset: u64, limit: u64)
     -> Result<Vec<String>, DatabaseError>;
+    async fn load_bloom_snapshot(&self, name: &str) -> Result<Option<Vec<u8>>, DatabaseError>;
+    async fn save_bloom_snapshot(&self, name: &str, data: &[u8]) -> Result<(), DatabaseError>;
 }

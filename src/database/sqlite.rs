@@ -347,6 +347,38 @@ impl UrlDatabase for SqliteUrlDatabase {
             })?;
         Ok(())
     }
+
+    async fn load_bloom_snapshot(&self, name: &str) -> Result<Option<Vec<u8>>, DatabaseError> {
+        let data = sqlx::query_scalar::<_, Vec<u8>>(
+            "SELECT data FROM bloom_snapshots WHERE name = ? LIMIT 1",
+        )
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(data)
+    }
+
+    async fn save_bloom_snapshot(&self, name: &str, data: &[u8]) -> Result<(), DatabaseError> {
+        sqlx::query(
+            r#"
+            INSERT INTO bloom_snapshots (name, data, updated_at)
+            VALUES (?1, ?2, CURRENT_TIMESTAMP)
+            ON CONFLICT(name)
+            DO UPDATE SET
+                data = excluded.data,
+                updated_at = CURRENT_TIMESTAMP
+            "#,
+        )
+        .bind(name)
+        .bind(data)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(())
+    }
 }
 
 /// Creates a SQLite connection pool from configuration settings.

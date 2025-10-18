@@ -273,6 +273,38 @@ impl UrlDatabase for PostgresUrlDatabase {
             })?;
         Ok(())
     }
+
+    async fn load_bloom_snapshot(&self, name: &str) -> Result<Option<Vec<u8>>, DatabaseError> {
+        let data = sqlx::query_scalar::<_, Vec<u8>>(
+            "SELECT data FROM bloom_snapshots WHERE name = $1 LIMIT 1",
+        )
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(data)
+    }
+
+    async fn save_bloom_snapshot(&self, name: &str, data: &[u8]) -> Result<(), DatabaseError> {
+        sqlx::query(
+            r#"
+            INSERT INTO bloom_snapshots (name, data)
+            VALUES ($1, $2)
+            ON CONFLICT (name)
+            DO UPDATE
+            SET data = EXCLUDED.data,
+                updated_at = NOW()
+            "#,
+        )
+        .bind(name)
+        .bind(data)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(())
+    }
 }
 
 /// Creates a PostgreSQL connection pool from configuration settings.

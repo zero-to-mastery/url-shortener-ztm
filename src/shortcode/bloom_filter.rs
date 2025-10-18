@@ -1,20 +1,19 @@
 // shortcode/mod.rs
 use crate::database::UrlDatabase;
-use anyhow::{Context, Result};
-use fastbloom_rs::{BloomFilter, FilterBuilder, Membership};
+use anyhow::{Context, Result, anyhow};
+use fastbloom_rs::{BloomFilter, FilterBuilder, Hashes, Membership};
 use parking_lot::RwLock;
-use std::{env, fs, path::Path, sync::Arc};
+use std::{env, sync::Arc};
 
-pub const S2L_SNAPSHOT: &str = "./data/s2lbf_snapshot.bin";
-pub const L2S_SNAPSHOT: &str = "./data/l2sbf_snapshot.bin";
-const EXPECTED: u64 = 100_000_000;
+pub const S2L_SNAPSHOT_KEY: &str = "short_to_long";
+const EXPECTED: u64 = 10_000_000;
 const FPP: f64 = 0.01;
 const PAGE: u64 = 50_000;
 
 pub trait ProbSet: Send + Sync {
     fn may_contain(&self, key: &str) -> bool;
     fn insert(&self, key: &str);
-    fn save_to_file_with_hashes(&self, path: &str) -> Result<()>;
+    fn snapshot(&self) -> Result<Vec<u8>>;
 
     fn extend<'a, I>(&self, items: I)
     where
@@ -28,9 +27,8 @@ pub trait ProbSet: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct BloomPair {
+pub struct BloomState {
     pub s2l: Arc<dyn ProbSet>,
-    pub l2s: Arc<dyn ProbSet>,
 }
 
 pub struct LocalBloom {
@@ -57,10 +55,23 @@ impl LocalBloom {
             inner: RwLock::new(bf),
         }
     }
-    pub fn from_file(path: &str) -> Result<Self> {
-        let bf = BloomFilter::from_file_with_hashes(path);
+
+    pub fn from_snapshot(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() < 4 {
+            return Err(anyhow!("Bloom snapshot payload too small"));
+        }
+        let hashes = u32::from_be_bytes(bytes[..4].try_into()?);
+        let body = &bytes[4..];
+        assert_eq!(body.len() % 8, 0);
+
+        let mut words = Vec::<u64>::with_capacity(body.len() / 8);
+        for chunk in body.chunks_exact(8) {
+            words.push(u64::from_ne_bytes(chunk.try_into()?));
+        }
+        let filter = fastbloom_rs::BloomFilter::from_u64_array(&words, hashes);
+
         Ok(Self {
-            inner: RwLock::new(bf),
+            inner: RwLock::new(filter),
         })
     }
 }
@@ -73,43 +84,29 @@ impl ProbSet for LocalBloom {
         self.inner.write().add(key.as_bytes())
     }
 
-    fn save_to_file_with_hashes(&self, path: &str) -> Result<()> {
-        // Create the parent directory for the snapshot if it doesn't exist
-        if let Some(parent) = Path::new(path).parent()
-            && !parent.as_os_str().is_empty()
-        {
-            fs::create_dir_all(parent).with_context(|| {
-                format!(
-                    "failed to create directory for Bloom snapshot {}",
-                    parent.display()
-                )
-            })?;
-        }
-        let mut bf = self.inner.write();
-        bf.save_to_file_with_hashes(path);
-
-        Ok(())
+    fn snapshot(&self) -> Result<Vec<u8>> {
+        let bf = self.inner.read();
+        let mut payload = Vec::with_capacity(4 + bf.get_u8_array().len());
+        payload.extend_from_slice(&bf.hashes().to_be_bytes());
+        payload.extend_from_slice(bf.get_u8_array());
+        Ok(payload)
     }
 }
 
-pub async fn build_bloom_pair(db: &Arc<dyn UrlDatabase>) -> Result<BloomPair> {
-    let s2l_path = Path::new(S2L_SNAPSHOT);
-    let l2s_path = Path::new(L2S_SNAPSHOT);
-
-    // Prefer to load from snapshots if they exist
-    if s2l_path.exists() && l2s_path.exists() {
-        let s2l = LocalBloom::from_file(s2l_path.to_str().unwrap())?;
-        let l2s = LocalBloom::from_file(l2s_path.to_str().unwrap())?;
-        tracing::info!("Loaded Bloom snapshots.");
-        return Ok(BloomPair {
-            s2l: Arc::new(s2l),
-            l2s: Arc::new(l2s),
-        });
+pub async fn build_bloom_state(db: &Arc<dyn UrlDatabase>) -> Result<BloomState> {
+    if let Some(bytes) = db
+        .load_bloom_snapshot(S2L_SNAPSHOT_KEY)
+        .await
+        .context("failed to load s2l bloom snapshot from database")?
+    {
+        let s2l = LocalBloom::from_snapshot(&bytes)
+            .context("failed to decode s2l bloom snapshot payload")?;
+        tracing::info!("Loaded Bloom snapshot from database.");
+        return Ok(BloomState { s2l: Arc::new(s2l) });
     }
 
     // First-time build: pull data from DB in pages
     let mut shorts: Vec<Vec<u8>> = Vec::new();
-    let longs: Vec<Vec<u8>> = Vec::new();
 
     let mut offset: u64 = 0;
 
@@ -120,7 +117,6 @@ pub async fn build_bloom_pair(db: &Arc<dyn UrlDatabase>) -> Result<BloomPair> {
         }
         for rec in &batch {
             shorts.push(rec.as_bytes().to_vec());
-            // longs.push(rec.url.as_bytes().to_vec());
         }
         offset += batch.len() as u64;
         if batch.len() < PAGE as usize {
@@ -129,21 +125,25 @@ pub async fn build_bloom_pair(db: &Arc<dyn UrlDatabase>) -> Result<BloomPair> {
     }
 
     let s2l = LocalBloom::from_items(shorts.iter().map(|v| &v[..]), EXPECTED, FPP);
-    let l2s = LocalBloom::from_items(longs.iter().map(|v| &v[..]), EXPECTED, FPP);
 
     if not_disable_bf_snapshots() {
-        if let Err(err) = s2l.save_to_file_with_hashes(s2l_path.to_str().unwrap()) {
-            tracing::warn!(error = %err, "failed to persist s2l Bloom snapshot");
-        }
-        if let Err(err) = l2s.save_to_file_with_hashes(l2s_path.to_str().unwrap()) {
-            tracing::warn!(error = %err, "failed to persist l2s Bloom snapshot");
+        match s2l.snapshot() {
+            Ok(bytes) => {
+                if let Err(err) = db
+                    .save_bloom_snapshot(S2L_SNAPSHOT_KEY, &bytes)
+                    .await
+                    .context("failed to persist s2l bloom snapshot to database")
+                {
+                    tracing::warn!(error = %err, "failed to persist s2l Bloom snapshot");
+                }
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "unable to serialize s2l Bloom snapshot");
+            }
         }
     }
 
-    Ok(BloomPair {
-        s2l: Arc::new(s2l),
-        l2s: Arc::new(l2s),
-    })
+    Ok(BloomState { s2l: Arc::new(s2l) })
 }
 
 pub(crate) fn not_disable_bf_snapshots() -> bool {
