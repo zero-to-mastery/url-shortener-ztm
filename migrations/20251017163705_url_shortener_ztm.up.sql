@@ -51,3 +51,11 @@ WHEN EXISTS (SELECT 1 FROM aliases WHERE alias = NEW.code)
 BEGIN
   SELECT RAISE(ABORT, 'code conflicts with existing alias');
 END;
+
+DROP VIEW IF EXISTS primary_codes_no_alias;
+CREATE VIEW primary_codes_no_alias AS
+SELECT u.code AS code
+FROM urls u
+WHERE NOT EXISTS (
+    SELECT 1 FROM aliases a WHERE a.target_id = u.id
+);

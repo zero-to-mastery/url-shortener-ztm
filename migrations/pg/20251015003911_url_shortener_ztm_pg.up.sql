@@ -89,5 +89,12 @@ BEGIN
   RETURN;
 END $$;
 
-COMMIT;
+DROP VIEW IF EXISTS primary_codes_no_alias;
+CREATE VIEW primary_codes_no_alias AS
+SELECT u.code AS code
+FROM urls u
+WHERE NOT EXISTS (
+    SELECT 1 FROM aliases a WHERE a.target_id = u.id
+);
 
+COMMIT;

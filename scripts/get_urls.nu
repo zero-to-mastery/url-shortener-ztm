@@ -1,4 +1,4 @@
-def main [
+export def main [
     --output_path (-o): path = "urls.txt" # output urls.txt path location
 ] {
     curl -L https://tranco-list.eu/download/daily/tranco_4N3XX-1m.csv.zip -o top-1m.csv.zip

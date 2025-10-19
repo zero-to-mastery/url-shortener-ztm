@@ -11,15 +11,14 @@ def try_get [file: path]: nothing -> path {
 
 def ensure_urls_in_db_csv []: nothing -> path {
     let ts = timestamp
-    mut csv = try_get ./scripts/data/urls_in_db*.csv
+    mut csv = try_get ./scripts/data/in_db/urls*.csv
 
     if ($csv == "") {
-        print "→ generating urls_in_db_*.csv via get_ulr_data_from_db.nu"
+        print "→ generating urls*.csv via get_ulr_data_from_db.nu"
         mkdir "./scripts/data" | ignore
-        let out = $"./scripts/data/urls_in_db_($ts).csv"
-        nu ./scripts/get_ulr_data_from_db.nu -o $out
+        nu ./scripts/get_ulr_data_from_db.nu
 
-        $csv = $out
+        $csv = try_get ./scripts/data/in_db/urls*.csv
     }
 
     $csv

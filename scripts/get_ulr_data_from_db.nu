@@ -1,10 +1,10 @@
 # Dependencies: psql / sqlite3; in container mode, ensure the client exists inside the container.
 
-def main [
+export def main [
   --db_type: string     # sqlite | pg
   --db_url: string      # sqlite: file path or sqlite://... ; pg: postgres://...
   --db_yml: path        = "./configuration/base.yml"   # Optional YAML; CLI flags take precedence
-  --output (-o): path        = "./scripts/data"             # Export directory
+  --output (-o): path   = "./scripts/data/in_db"             # Export directory
   --tables: string      = "urls"                       # Tables to export, comma-separated (supports schema.table)
   --container: string   = ""                           # Docker container ID/Name; empty = run on host
 ] {
@@ -16,14 +16,14 @@ def main [
     | compact | first | default "" | str downcase
   )
   let eff_url = (
-    [ $db_url ($cfg.database.url? | default null) ]
+    [ $db_url ($cfg.database.database_path? | default null) ]
     | compact | first | default ""
   )
 
   if $eff_type == "" { error make { msg: "Provide --db_type or set database.type in YAML" } }
   if $eff_url  == "" { error make { msg: "Provide --db_url or set database.url in YAML" } }
 
-  # mkdir $output
+  mkdir $output | ignore
 
   # Normalize --tables (commas/whitespace supported)
   let tbls = if ($tables | str length) == 0 {
@@ -97,15 +97,15 @@ def export-sqlite [
   for t in $target_tables {
     let tname = ($t | into string)
     let fname = (sanitize_filename $tname) + ".csv"
-    # let outfile = ($outdir | path join $fname)
+    let outfile = ($outdir | path join $fname)
     let q = $"SELECT * FROM \"($tname)\";"
 
     if ($container | is-empty) {
-      ^sqlite3 -header -csv $db_path $q | save --raw --force $outdir
+      ^sqlite3 -header -csv $db_path $q | save --raw --force $outfile
     } else {
-      ^docker exec $container sqlite3 -header -csv $db_path $q | save --raw --force $outdir
+      ^docker exec $container sqlite3 -header -csv $db_path $q | save --raw --force $outfile
     }
-    print $"[SQLite] Exported table: ($tname) -> ($outdir)"
+    print $"[SQLite] Exported table: ($tname) -> ($outfile)"
   }
 }
 
@@ -149,21 +149,19 @@ def export-pg [
     let qtable  = (quote_ident $table)
     let obj     = if ($qschema | str length) > 0 { $"($qschema).($qtable)" } else { $qtable }
 
-    let fname = ((if ($schema | str length) > 0 { $"($schema)__($table)" } else { $table }) | sanitize_filename) + ".csv"
-    # let outfile = ($outdir | path join $fname)
-    # let outfile_abs = ($outfile | path expand)
-    # let outfile_sql_lit = (escape_single_quote $outfile_abs)
-    let cmd = $"COPY ($obj) TO STDOUT WITH \(FORMAT CSV, HEADER\)"
+    let fname   = ((if ($schema | str length) > 0 { $"($schema)_($table)" } else { $table }) | sanitize_filename) + ".csv"
+    let outfile = ($outdir | path join $fname)
+    let cmd = $"COPY \(SELECT * FROM ($obj)\) TO STDOUT WITH \(FORMAT CSV, HEADER\)"
 
     if not $use_dk {
       # Host: stream CSV to file; \copy writes client-side
-      print $"Running: psql <url> -c: ($cmd) -> ($outdir)"
-      ^psql ($pg_url) -c ($cmd) | save --raw --force ($outdir)
+      print $"Running: psql <url> -c ($cmd) | save --raw --force ($outfile)"
+      ^psql ($pg_url) -c ($cmd) | save --raw --force ($outfile)
     } else {
       # Container: stream CSV via STDOUT back to host
-      ^docker exec $container psql $pg_url -c $cmd | save --raw --force $outdir
+      ^docker exec $container psql $pg_url -c $cmd | save --raw --force $outfile
     }
 
-    print $"[Postgres] Exported table: ($table) -> ($outdir)"
+    print $"[Postgres] Exported table: ($table) -> ($outfile)"
   }
 }
