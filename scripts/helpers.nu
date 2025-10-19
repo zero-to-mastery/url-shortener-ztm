@@ -25,3 +25,14 @@ export def timestamp [] { date now | format date "%Y%m%d%H%M%S" }
 export def exists_and_nonempty [p : path]: nothing -> bool {
   try { (ls ($p | into glob) | get size.0 | into int) > 0 } catch { false }
 }
+
+export def cal_gen_pct [num: int pct: int]: nothing -> int {
+    let pct_decimal = ($pct | into float | $in / 100)
+  let counts = (if $pct_decimal == 1 {
+      error make { msg: "pct cannot be 100" }
+  } else {
+      ($num * $pct_decimal) / (1 - $pct_decimal)
+  } | math round)
+
+  $counts
+}

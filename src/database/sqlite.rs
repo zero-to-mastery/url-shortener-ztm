@@ -34,6 +34,8 @@
 //!    r#type: DatabaseType::Sqlite,
 //!     url: "database.db".to_string(),
 //!     create_if_missing: true,
+//!     max_connections: Some(16),
+//!     min_connections: Some(4),
 //! };
 //! let db = SqliteUrlDatabase::from_config(&config).await?;
 //!
@@ -49,10 +51,15 @@
 
 use super::{DatabaseError, UrlDatabase};
 use crate::configuration::DatabaseSettings;
-use crate::models::UrlRecord;
+use crate::models::{UpsertResult, Urls};
 use async_trait::async_trait;
+use sha2::{Digest, Sha256};
+use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 use std::str::FromStr;
+
+const MAX_CAP: u32 = 64;
+const MIN_CAP: u32 = 1;
 
 /// SQLite implementation of the [`UrlDatabase`] trait.
 ///
@@ -77,6 +84,8 @@ use std::str::FromStr;
 ///     r#type: DatabaseType::Sqlite,
 ///     url: "database.db".to_string(),
 ///     create_if_missing: true,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let db = SqliteUrlDatabase::from_config(&config).await?;
 /// # Ok(())
@@ -136,6 +145,8 @@ impl SqliteUrlDatabase {
     ///     r#type: DatabaseType::Sqlite,
     ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// let db = SqliteUrlDatabase::from_config(&config).await?;
     /// # Ok(())
@@ -168,7 +179,7 @@ impl SqliteUrlDatabase {
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, max_connections: Some(16),  min_connections: Some(4), }; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// db.migrate().await?; // Set up the database schema
     /// # Ok(())
     /// # }
@@ -186,15 +197,17 @@ impl SqliteUrlDatabase {
 #[async_trait]
 impl UrlDatabase for SqliteUrlDatabase {
     /// Retrieves the short ID by original URL from the SQLite database.
-    async fn get_id_by_url(&self, url: &str) -> Result<String, DatabaseError> {
-        let row = sqlx::query_as::<_, (String,)>("SELECT id FROM urls WHERE url = ?")
-            .bind(url)
+    async fn get_id_by_url(&self, url: &str) -> Result<Urls, DatabaseError> {
+        let hash = sha256_bytes(url);
+
+        let row = sqlx::query_as::<_, Urls>("SELECT id, code FROM urls WHERE url_hash = ? LIMIT 1")
+            .bind(&hash[..]) // BLOB
             .fetch_optional(&self.pool)
             .await
             .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
         match row {
-            Some(record) => Ok(record.0),
+            Some(record) => Ok(record),
             None => Err(DatabaseError::NotFound),
         }
     }
@@ -222,26 +235,49 @@ impl UrlDatabase for SqliteUrlDatabase {
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, max_connections: Some(16),  min_connections: Some(4),}; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// db.insert_url("abc123", "https://example.com").await?;
     /// # Ok(())
     /// # }
     /// ```
-    async fn insert_url(&self, id: &str, url: &str) -> Result<(), DatabaseError> {
-        sqlx::query("INSERT INTO urls (id, url) VALUES (?, ?)")
-            .bind(id)
-            .bind(url)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                if e.to_string().contains("UNIQUE constraint failed") {
-                    DatabaseError::Duplicate
-                } else {
-                    DatabaseError::QueryError(e.to_string())
-                }
-            })?;
+    async fn insert_url(&self, code: &str, url: &str) -> Result<UpsertResult, DatabaseError> {
+        let hash = sha256_bytes(url);
 
-        Ok(())
+        let inserted: Option<(i64,)> = sqlx::query_as(
+            r#"
+                INSERT INTO urls(code, url, url_hash)
+                VALUES (?1, ?2, ?3)
+                ON CONFLICT(url_hash) DO NOTHING
+                RETURNING id;
+            "#,
+        )
+        .bind(code)
+        .bind(url)
+        .bind(&hash[..]) // BLOB
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| {
+            // `code` UNIQUE violation -> Duplicate id
+            if e.to_string()
+                .contains("UNIQUE constraint failed: urls.code")
+            {
+                DatabaseError::Duplicate
+            } else {
+                DatabaseError::QueryError(e.to_string())
+            }
+        })?;
+
+        if let Some((id,)) = inserted {
+            return Ok(UpsertResult { id, created: true });
+        }
+
+        let (id,): (i64,) = sqlx::query_as(r#"SELECT id FROM urls WHERE url_hash = ?1 LIMIT 1"#)
+            .bind(&hash[..])
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(UpsertResult { id, created: false })
     }
 
     /// Retrieves a URL by its short ID from the SQLite database.
@@ -267,18 +303,20 @@ impl UrlDatabase for SqliteUrlDatabase {
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, max_connections: Some(16),  min_connections: Some(4),}; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// let url = db.get_url("abc123").await?;
     /// println!("Original URL: {}", url);
     /// # Ok(())
     /// # }
     /// ```
     async fn get_url(&self, id: &str) -> Result<String, DatabaseError> {
-        let row = sqlx::query_as::<_, (String,)>("SELECT url FROM urls WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        let row = sqlx::query_as::<_, (String,)>(
+            "SELECT url FROM all_short_codes u WHERE u.code = ? LIMIT 1;",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
         match row {
             Some(record) => Ok(record.0),
@@ -290,16 +328,66 @@ impl UrlDatabase for SqliteUrlDatabase {
         &self,
         offset: u64,
         limit: u64,
-    ) -> Result<Vec<UrlRecord>, DatabaseError> {
-        let records =
-            sqlx::query_as::<_, UrlRecord>("SELECT id, url FROM urls ORDER BY id LIMIT ? OFFSET ?")
+    ) -> Result<Vec<String>, DatabaseError> {
+        let codes: Vec<String> =
+            sqlx::query_scalar("SELECT code FROM all_short_codes LIMIT ? OFFSET ?")
                 .bind(limit as i64)
                 .bind(offset as i64)
                 .fetch_all(&self.pool)
                 .await
                 .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-        Ok(records)
+        Ok(codes)
+    }
+
+    async fn insert_alias(&self, alias_code: &str, code_id: i64) -> Result<(), DatabaseError> {
+        sqlx::query("INSERT INTO aliases (alias, target_id) VALUES (?, ?)")
+            .bind(alias_code)
+            .bind(code_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                if e.to_string()
+                    .contains("UNIQUE constraint failed: aliases.alias")
+                {
+                    DatabaseError::Duplicate
+                } else {
+                    DatabaseError::QueryError(e.to_string())
+                }
+            })?;
+        Ok(())
+    }
+
+    async fn load_bloom_snapshot(&self, name: &str) -> Result<Option<Vec<u8>>, DatabaseError> {
+        let data = sqlx::query_scalar::<_, Vec<u8>>(
+            "SELECT data FROM bloom_snapshots WHERE name = ? LIMIT 1",
+        )
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(data)
+    }
+
+    async fn save_bloom_snapshot(&self, name: &str, data: &[u8]) -> Result<(), DatabaseError> {
+        sqlx::query(
+            r#"
+                INSERT INTO bloom_snapshots (name, data, updated_at)
+                VALUES (?1, ?2, CURRENT_TIMESTAMP)
+                ON CONFLICT(name)
+                DO UPDATE SET
+                    data = excluded.data,
+                    updated_at = CURRENT_TIMESTAMP
+            "#,
+        )
+        .bind(name)
+        .bind(data)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(())
     }
 }
 
@@ -329,6 +417,8 @@ impl UrlDatabase for SqliteUrlDatabase {
 ///     r#type: DatabaseType::Sqlite,
 ///     url: "database.db".to_string(),
 ///     create_if_missing: true,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let pool = get_connection_pool(&config).await?;
 /// # Ok(())
@@ -336,7 +426,23 @@ impl UrlDatabase for SqliteUrlDatabase {
 /// ```
 pub async fn get_connection_pool(config: &DatabaseSettings) -> Result<SqlitePool, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(&config.connection_string())?
-        .create_if_missing(config.create_if_missing);
+        .create_if_missing(config.create_if_missing)
+        .foreign_keys(true);
 
-    SqlitePool::connect_with(options).await
+    let cores = num_cpus::get().max(MIN_CAP as usize);
+    let default_max = cores.saturating_mul(2).max(4) as u32; // minimum 4
+    let mut max_conn = config.max_connections.unwrap_or(default_max);
+
+    max_conn = max_conn.clamp(MIN_CAP, MAX_CAP);
+
+    SqlitePoolOptions::new()
+        .max_connections(max_conn)
+        .connect_with(options)
+        .await
+}
+
+fn sha256_bytes(s: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(s.as_bytes());
+    hasher.finalize().into()
 }

@@ -33,7 +33,7 @@
 use crate::configuration::Settings;
 use crate::database::UrlDatabase;
 use crate::generator::ShortCodeGenerator;
-use crate::shortcode::bloom_filter::BloomPair;
+use crate::shortcode::bloom_filter::BloomState;
 use axum_macros::FromRef;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -71,6 +71,8 @@ use uuid::Uuid;
 ///     r#type: DatabaseType::Sqlite,
 ///     url: "database.db".to_string(),
 ///     create_if_missing: true,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();
@@ -87,7 +89,7 @@ pub struct AppState {
     pub database: Arc<dyn UrlDatabase>,
     /// Short code generator for creating unique short URLs
     pub code_generator: Arc<dyn ShortCodeGenerator>,
-    pub blooms: BloomPair,
+    pub blooms: BloomState,
     /// The set of characters that can be used when generating short codes. \
     /// Typically includes alphanumeric characters (e.g., `a-z`, `A-Z`, `0-9`).
     pub allowed_chars: HashSet<char>,
@@ -130,6 +132,8 @@ impl AppState {
     ///     r#type: DatabaseType::Sqlite,
     ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
     /// let api_key = Uuid::parse_str("e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5")?;
@@ -143,7 +147,7 @@ impl AppState {
     pub fn new(
         database: Arc<dyn UrlDatabase>,
         code_generator: Arc<dyn ShortCodeGenerator>,
-        blooms: BloomPair,
+        blooms: BloomState,
         allowed_chars: HashSet<char>,
         api_key: Uuid,
         template_dir: String,

@@ -33,11 +33,9 @@ start-dev rate="false" log="debug":
     RUST_LOG={{log}} APP_RATE_LIMITING__ENABLED={{rate}} cargo run
 
 prepare-shorten-data:
-	#!{{shebang}}
 	nu ./scripts/prepare_shorten_data.nu
 
 prepare-redirect-data:
-	#!{{shebang}}
 	nu ./scripts/prepare_redirect_data.nu
 
 # ── 📊 Performance Tests - Shorten ────────────────────────────────
@@ -45,7 +43,7 @@ perf-shorten:
 	#!{{shebang}}
 	use '{{justfile_directory()}}/scripts/prepare_shorten_data.nu'
 
-	let ts = (date now | format date "%Y%m%d_%H%M%S")
+	let ts = (date now | format date "%Y-%m-%d_%H:%M:%S")
 	let file = prepare_shorten_data
 	let name = "shorten"
 	let prefix = $"./reports/($ts)_($name)"
@@ -90,3 +88,6 @@ perf-redirect:
 		K6_WEB_DASHBOARD_EXPORT: $"($prefix)_dashboard.html"
 	} { ^k6 run ./tests/perf/redirect.js }
 	open $"($prefix)_summary.txt"
+
+perf-shorten-bench:
+	nu "./tests/perf/run_shortener-bench.nu"

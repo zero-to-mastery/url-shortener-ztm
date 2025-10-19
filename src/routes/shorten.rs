@@ -4,10 +4,11 @@
 //! It processes requests to shorten URLs and stores them in the database with
 //! unique identifiers.
 
-use crate::database::DatabaseError;
+use crate::database::MAX_ALIAS_LENGTH;
 use crate::errors::ApiError;
 use crate::response::ApiResponse;
 use crate::state::AppState;
+use crate::{database::DatabaseError, models::UpsertResult};
 use axum::extract::{Query, State};
 use axum_extra::{TypedHeader, headers::Host};
 use axum_macros::debug_handler;
@@ -20,7 +21,6 @@ use tracing::instrument;
 /// We use 2048 as a reasonable limit to prevent abuse while supporting legitimate URLs.
 const MAX_URL_LENGTH: usize = 2048;
 const MAX_ID_RETRIES: usize = 8;
-const MAX_ALIAS_LENGTH: usize = 64;
 
 #[derive(Debug, Deserialize)]
 pub struct ShortenParams {
@@ -184,29 +184,19 @@ pub async fn post_shorten(
 
     let hostname = header.hostname();
 
-    // 3) Fast path: check Bloom filter (long → short).
-    // If it may exist, verify with the database.
-    if state.blooms.l2s.may_contain(norm.as_str()) {
-        match state.database.get_id_by_url(&norm).await {
-            Ok(existing_id) => {
-                tracing::info!("Hit existing mapping via bloom+db");
-                return Ok(make_response(hostname, &existing_id, &norm));
-            }
-            Err(DatabaseError::NotFound) => {
-                // False positive; proceed to insertion path.
-            }
-            Err(e) => {
-                tracing::error!("Database error on get_id: {}", e);
-                return Err(ApiError::Internal(e.to_string()));
-            }
-        }
+    let (upset, code) = insert_with_retry(&state, &norm).await?;
+    if upset.created {
+        state.blooms.s2l.insert(&code);
     }
 
-    // 4) Insert path: use custom alias if provided, otherwise generate with retries
-    let id = if let Some(alias) = params.alias.as_deref() {
-        validate_alias(alias, &state)?;
-        match state.database.insert_url(alias, &norm).await {
-            Ok(()) => alias.to_string(),
+    // 3) Insert path: use custom alias if provided, otherwise generate with retries
+    let final_code = if let Some(alias) = params.alias {
+        validate_alias(alias.as_str(), &state)?;
+        match state.database.insert_alias(alias.as_str(), upset.id).await {
+            Ok(()) => {
+                state.blooms.s2l.insert(&alias);
+                alias
+            }
             Err(DatabaseError::Duplicate) => {
                 return Err(ApiError::Conflict("Alias is already taken".to_string()));
             }
@@ -216,15 +206,11 @@ pub async fn post_shorten(
             }
         }
     } else {
-        insert_with_retry(&state, &norm).await?
+        code
     };
 
-    // 5) Optionally update Bloom filters after successful insertion
-    state.blooms.s2l.insert(id.as_str());
-    state.blooms.l2s.insert(norm.as_str());
-
     tracing::info!("URL shortened and saved successfully");
-    Ok(make_response(hostname, &id, &norm))
+    Ok(make_response(hostname, &final_code, &norm))
 }
 
 /// Parses and normalizes a URL:
@@ -280,15 +266,18 @@ pub fn normalize_url(raw: &str) -> Result<String, ApiError> {
 
 /// Inserts a new URL, retrying ID generation if duplicates occur.
 /// Relies on the database's Duplicate error to ensure atomicity and avoid TOCTOU issues.
-async fn insert_with_retry(state: &AppState, norm_url: &str) -> Result<String, ApiError> {
+async fn insert_with_retry(
+    state: &AppState,
+    norm_url: &str,
+) -> Result<(UpsertResult, String), ApiError> {
     for attempt in 0..MAX_ID_RETRIES {
-        let id = state.code_generator.generate().map_err(|e| {
+        let code = state.code_generator.generate().map_err(|e| {
             tracing::error!("Code generation error: {:?}", e);
             ApiError::Internal("Code generation failed".to_string())
         })?;
 
-        match state.database.insert_url(id.as_str(), norm_url).await {
-            Ok(()) => return Ok(id),
+        match state.database.insert_url(code.as_str(), norm_url).await {
+            Ok(upset) => return Ok((upset, code)),
             Err(DatabaseError::Duplicate) => {
                 tracing::warn!("ID collision on attempt {} — retrying", attempt + 1);
                 continue;

@@ -36,6 +36,8 @@
 //!     r#type: DatabaseType::Postgres,
 //!     url: "postgres://app:secret@localhost:5432/urlshortener".to_string(),
 //!     create_if_missing: false, // Not used by Postgres connector
+//!     max_connections: Some(16),
+//!     min_connections: Some(4),
 //! };
 //! let db = PostgresUrlDatabase::from_config(&config).await?;
 //!
@@ -57,13 +59,16 @@
 
 use super::{DatabaseError, UrlDatabase};
 use crate::configuration::DatabaseSettings;
-use crate::models::UrlRecord;
+use crate::models::{UpsertResult, Urls};
 use async_trait::async_trait;
 use sqlx::{
     Error as SqlxError, PgPool,
     postgres::{PgConnectOptions, PgPoolOptions},
 };
 use std::str::FromStr;
+
+const MAX_CAP: u32 = 96;
+const MIN_CAP: u32 = 2;
 
 /// PostgreSQL implementation of the [`UrlDatabase`] trait.
 ///
@@ -123,6 +128,8 @@ impl PostgresUrlDatabase {
     ///     r#type: DatabaseType::Postgres,
     ///     url: "postgres://app:secret@localhost:5432/urlshortener".to_string(),
     ///     create_if_missing: false,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// let db = PostgresUrlDatabase::from_config(&config).await?;
     /// # Ok(())
@@ -158,6 +165,8 @@ impl PostgresUrlDatabase {
     ///     r#type: DatabaseType::Postgres,
     ///     url: "postgres://app:secret@localhost:5432/urlshortener".to_string(),
     ///     create_if_missing: false,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// let db = PostgresUrlDatabase::from_config(&config).await?;
     /// db.migrate().await?; // Set up the database schema
@@ -176,14 +185,17 @@ impl PostgresUrlDatabase {
 #[async_trait]
 impl UrlDatabase for PostgresUrlDatabase {
     /// Retrieves the short ID by original URL from the PostgreSQL database.
-    async fn get_id_by_url(&self, url: &str) -> Result<String, DatabaseError> {
-        let row = sqlx::query_as::<_, (String,)>("SELECT id FROM urls WHERE url = $1")
-            .bind(url)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    async fn get_id_by_url(&self, url: &str) -> Result<Urls, DatabaseError> {
+        let row = sqlx::query_as::<_, Urls>(
+            "SELECT id, code FROM urls WHERE url_hash = digest($1, 'sha256') LIMIT 1",
+        )
+        .bind(url)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
         match row {
-            Some(record) => Ok(record.0),
+            Some(record) => Ok(record),
             None => Err(DatabaseError::NotFound),
         }
     }
@@ -196,11 +208,11 @@ impl UrlDatabase for PostgresUrlDatabase {
     ///
     /// * `id` - The short identifier for the URL
     /// * `url` - The original URL to store
-    async fn insert_url(&self, id: &str, url: &str) -> Result<(), DatabaseError> {
-        sqlx::query("INSERT INTO urls (id, url) VALUES ($1, $2)")
-            .bind(id)
+    async fn insert_url(&self, code: &str, url: &str) -> Result<UpsertResult, DatabaseError> {
+        sqlx::query_as::<_, UpsertResult>("SELECT * FROM upsert_url($1, $2)")
+            .bind(code)
             .bind(url)
-            .execute(&self.pool)
+            .fetch_one(&self.pool)
             .await
             .map_err(|e| {
                 if is_unique_violation(&e) {
@@ -208,8 +220,7 @@ impl UrlDatabase for PostgresUrlDatabase {
                 } else {
                     DatabaseError::QueryError(e.to_string())
                 }
-            })?;
-        Ok(())
+            })
     }
 
     /// Retrieves a URL by its short ID from the PostgreSQL database.
@@ -225,12 +236,14 @@ impl UrlDatabase for PostgresUrlDatabase {
     ///
     /// Returns `Ok(String)` with the original URL if found, or
     /// `Err(DatabaseError::NotFound)` if no record exists.
-    async fn get_url(&self, id: &str) -> Result<String, DatabaseError> {
-        let row = sqlx::query_as::<_, (String,)>("SELECT url FROM urls WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    async fn get_url(&self, code: &str) -> Result<String, DatabaseError> {
+        let row = sqlx::query_as::<_, (String,)>(
+            "SELECT url FROM all_short_codes u WHERE u.code = $1 LIMIT 1;",
+        )
+        .bind(code)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
         match row {
             Some(record) => Ok(record.0),
@@ -242,17 +255,64 @@ impl UrlDatabase for PostgresUrlDatabase {
         &self,
         offset: u64,
         limit: u64,
-    ) -> Result<Vec<UrlRecord>, DatabaseError> {
-        let records = sqlx::query_as::<_, UrlRecord>(
-            "SELECT id, url FROM urls ORDER BY id LIMIT $1 OFFSET $2",
+    ) -> Result<Vec<String>, DatabaseError> {
+        let codes: Vec<String> =
+            sqlx::query_scalar("SELECT code FROM all_short_codes LIMIT $1 OFFSET $2")
+                .bind(limit as i64)
+                .bind(offset as i64)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(codes)
+    }
+
+    async fn insert_alias(&self, alias_code: &str, code_id: i64) -> Result<(), DatabaseError> {
+        sqlx::query("INSERT INTO aliases (alias, target_id) VALUES ($1, $2)")
+            .bind(alias_code)
+            .bind(code_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                if is_unique_violation(&e) {
+                    DatabaseError::Duplicate
+                } else {
+                    DatabaseError::QueryError(e.to_string())
+                }
+            })?;
+        Ok(())
+    }
+
+    async fn load_bloom_snapshot(&self, name: &str) -> Result<Option<Vec<u8>>, DatabaseError> {
+        let data = sqlx::query_scalar::<_, Vec<u8>>(
+            "SELECT data FROM bloom_snapshots WHERE name = $1 LIMIT 1",
         )
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
+        .bind(name)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-        Ok(records)
+        Ok(data)
+    }
+
+    async fn save_bloom_snapshot(&self, name: &str, data: &[u8]) -> Result<(), DatabaseError> {
+        sqlx::query(
+            r#"
+                INSERT INTO bloom_snapshots (name, data)
+                VALUES ($1, $2)
+                ON CONFLICT (name)
+                DO UPDATE
+                SET data = EXCLUDED.data,
+                    updated_at = NOW()
+            "#,
+        )
+        .bind(name)
+        .bind(data)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok(())
     }
 }
 
@@ -279,6 +339,8 @@ impl UrlDatabase for PostgresUrlDatabase {
 ///     r#type: DatabaseType::Postgres,
 ///     url: "postgres://app:secret@localhost:5432/urlshortener".to_string(),
 ///     create_if_missing: false,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let pool = get_connection_pool(&config).await?;
 /// # Ok(())
@@ -286,7 +348,36 @@ impl UrlDatabase for PostgresUrlDatabase {
 /// ```
 pub async fn get_connection_pool(config: &DatabaseSettings) -> Result<PgPool, SqlxError> {
     let options = PgConnectOptions::from_str(&config.connection_string())?;
-    PgPoolOptions::new().connect_with(options).await
+
+    let cores = num_cpus::get().max(1) as u32;
+
+    let default_max = cores.saturating_mul(4);
+    let default_min = cores.saturating_mul(2);
+
+    let mut max_conn = config.max_connections.unwrap_or(default_max);
+    let mut min_conn = config.min_connections.unwrap_or(default_min);
+
+    max_conn = max_conn.clamp(MIN_CAP, MAX_CAP);
+    if min_conn < MIN_CAP {
+        min_conn = MIN_CAP;
+    }
+
+    if min_conn > max_conn {
+        tracing::warn!(
+            requested_min = %min_conn,
+            requested_max = %max_conn,
+            "min_connections > max_connections, adjusting min_connections to max_connections"
+        );
+        min_conn = max_conn;
+    }
+
+    tracing::warn!(cores = %cores, min_connections = %min_conn, max_connections = %max_conn, "Postgres pool sizes");
+
+    PgPoolOptions::new()
+        .max_connections(max_conn)
+        .min_connections(min_conn)
+        .connect_with(options)
+        .await
 }
 
 // ---- helpers ----
@@ -306,7 +397,6 @@ mod tests {
     use super::*;
     use sqlx::PgPool;
     use std::env;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     /// Integration test for `PostgresUrlDatabase`.
     ///
@@ -329,31 +419,28 @@ mod tests {
         db.migrate().await.expect("migrations failed");
 
         // Generate unique test id
-        let id = format!(
-            "test-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("time went backwards")
-                .as_nanos()
-        );
+        let code = "Abc123";
         let url = "https://example.com/test";
 
         // Insert and fetch URL
-        db.insert_url(&id, url).await.expect("insert failed");
-        let fetched = db.get_url(&id).await.expect("get_url failed");
+        db.insert_url(code, url).await.expect("insert failed");
+        let fetched = db.get_url(code).await.expect("get_url failed");
         assert_eq!(fetched, url);
 
         // Check duplicate insert
-        let duplicate = db.insert_url(&id, url).await;
-        assert!(matches!(duplicate, Err(DatabaseError::Duplicate)));
+        let duplicate = db.insert_url(code, url).await.unwrap();
+        assert!(
+            !duplicate.created,
+            "duplicate insert should not create a new record"
+        );
 
         // Check not found
         let missing = db.get_url("this-id-does-not-exist-hopefully").await;
         assert!(matches!(missing, Err(DatabaseError::NotFound)));
 
         // Cleanup
-        sqlx::query("DELETE FROM urls WHERE id = $1")
-            .bind(&id)
+        sqlx::query("DELETE FROM urls WHERE code = $1")
+            .bind(code)
             .execute(&pool)
             .await
             .expect("cleanup failed");

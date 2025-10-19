@@ -3,7 +3,7 @@
 //! This module provides the URL redirect handler for the URL shortener service.
 //! It handles requests to shortened URLs and redirects users to the original URLs.
 
-use crate::database::DatabaseError;
+use crate::database::{DatabaseError, MAX_ALIAS_LENGTH};
 use crate::errors::ApiError;
 use crate::state::AppState;
 use axum::{
@@ -82,19 +82,19 @@ pub async fn get_redirect(
 ) -> Result<impl IntoResponse, ApiError> {
     // Validate against configured length and alphabet before DB lookup
     // check length (use char count to be safe)
-    if id.chars().count() != state.config.shortener.length {
-        tracing::warn!("rejecting redirect: invalid id length");
+    if id.chars().count() > MAX_ALIAS_LENGTH {
+        tracing::info!("rejecting redirect: invalid id length");
         return Err(ApiError::NotFound("URL not found".to_string()));
     }
 
     // Use precomputed allowed_chars from AppState
     if id.chars().any(|c| !state.allowed_chars.contains(&c)) {
-        tracing::warn!("rejecting redirect: id contains invalid characters");
+        tracing::info!("rejecting redirect: id contains invalid characters");
         return Err(ApiError::NotFound("URL not found".to_string()));
     }
 
     if !state.blooms.s2l.may_contain(&id) {
-        tracing::warn!("rejecting redirect: id is not in the short to long filter");
+        tracing::info!("rejecting redirect: id is not in the short to long filter");
         return Err(ApiError::NotFound("URL not found".to_string()));
     }
 

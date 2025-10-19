@@ -10,7 +10,7 @@ use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
 use url_shortener_ztm_lib::generator::{self, build_generator};
 use url_shortener_ztm_lib::get_configuration;
 use url_shortener_ztm_lib::routes::shorten::normalize_url;
-use url_shortener_ztm_lib::shortcode::bloom_filter::build_bloom_pair;
+use url_shortener_ztm_lib::shortcode::bloom_filter::build_bloom_state;
 use url_shortener_ztm_lib::startup::build_router;
 use url_shortener_ztm_lib::state::AppState;
 use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
@@ -78,7 +78,7 @@ pub async fn spawn_app() -> TestApp {
     // Store the API key for use in tests
     let api_key = configuration.application.api_key;
 
-    let blooms = build_bloom_pair(&database).await.unwrap();
+    let blooms = build_bloom_state(&database).await.unwrap();
 
     let test_app_state = AppState::new(
         database.clone(),
