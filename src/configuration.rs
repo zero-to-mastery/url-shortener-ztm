@@ -19,7 +19,7 @@
 //! ```bash
 //! APP_APPLICATION__PORT=3000
 //! APP_APPLICATION__API_KEY=your-api-key-here
-//! APP_DATABASE__DATABASE_PATH=./my-database.db
+//! APP_DATABASE__DATABASE_URL=./my-database.db
 //! ```
 //!
 //! ## Example Configuration
@@ -123,7 +123,7 @@ pub struct DatabaseSettings {
     /// Type of the database (e.g., SQLite, PostgreSQL)
     pub r#type: DatabaseType,
     /// Path to the SQLite database file (or ":memory:" for in-memory database)
-    #[serde(alias = "database_path")]
+    #[serde(alias = "url")]
     pub url: String,
     /// Whether to create the database file if it doesn't exist
     #[serde(default)]
@@ -270,7 +270,7 @@ impl TryFrom<String> for Environment {
 /// Any configuration value can be overridden using environment variables:
 /// - `APP_APPLICATION__PORT=3000`
 /// - `APP_APPLICATION__API_KEY=your-key-here`
-/// - `APP_DATABASE__DATABASE_PATH=./my-db.db`
+/// - `APP_DATABASE__DATABASE_URL=./my-db.db`
 ///
 /// # Returns
 ///

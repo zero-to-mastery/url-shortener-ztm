@@ -242,7 +242,7 @@ Override any setting using environment variables with `APP_` prefix:
 ```bash
 APP_APPLICATION__PORT=3000
 APP_APPLICATION__API_KEY=your-new-api-key
-APP_DATABASE__DATABASE_PATH=./my-database.db
+APP_DATABASE__DATABASE_URL=./my-database.db
 ```
 
 ### API Key Security
@@ -284,8 +284,10 @@ Production guidance:
 
 ```yaml
 database:
-  database_path: "sqlite:database.db" # Path to SQLite database file
+  url: "sqlite:database.db" # Path to SQLite database file
   create_if_missing: true # Create database if it doesn't exist
+  max_connections: 16 # optinal set database pool connection
+  min_connections: 4  # optinal set database pool connection
 ```
 
 **PostgreSQL Configuration**
@@ -297,6 +299,8 @@ database:
   username: "app"
   password: "secret"
   database_name: "urlshortener"
+  max_connections: 64 # optinal set database pool connection
+  min_connections: 16  # optinal set database pool connection
   create_if_missing: true
 ```
 
@@ -304,7 +308,7 @@ database:
 
 ```yaml
 database:
-  database_path: ":memory:"
+  url: ":memory:"
   create_if_missing: true
 ```
 

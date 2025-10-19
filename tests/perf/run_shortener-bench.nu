@@ -19,7 +19,7 @@ export def main [
 
     let cfg = open ./configuration/base.yml
     let cmd = $"TRUNCATE urls, bloom_snapshots RESTART IDENTITY CASCADE;"
-    ^psql ($cfg.database.database_path) -c ($cmd) 
+    ^psql ($cfg.database.url) -c ($cmd) 
     
     
     gen_req_url --limit 150_000 --shortener_only --sh_code_pct 100 --sh_alias_pct 0 --sh_dup_alias_pct 0 --sh_dup_code_pct 0

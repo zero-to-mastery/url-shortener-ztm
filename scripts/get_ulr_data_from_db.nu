@@ -16,7 +16,7 @@ export def main [
     | compact | first | default "" | str downcase
   )
   let eff_url = (
-    [ $db_url ($cfg.database.database_path? | default null) ]
+    [ $db_url ($cfg.database.url? | default null) ]
     | compact | first | default ""
   )
 

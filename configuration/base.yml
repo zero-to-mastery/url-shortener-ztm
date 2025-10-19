@@ -18,8 +18,10 @@ application:
   templates: "templates/**/*"
 database:
   type: sqlite
-  database_path: sqlite:database.db
+  url: sqlite:database.db
   create_if_missing: true
+  # max_connections: 64 # set database pool connecttion
+  # min_connections: 16
 rate_limiting:
   enabled: true
   requests_per_second: 10
