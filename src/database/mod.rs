@@ -29,6 +29,8 @@
 //!     r#type: DatabaseType::Sqlite,
 //!     url: "database.db".to_string(),
 //!     create_if_missing: true,
+//!     max_connections: Some(16),
+//!     min_connections: Some(4),
 //! }).await?;
 //!
 //! // Run migrations

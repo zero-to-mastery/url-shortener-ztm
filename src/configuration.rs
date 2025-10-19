@@ -128,6 +128,10 @@ pub struct DatabaseSettings {
     /// Whether to create the database file if it doesn't exist
     #[serde(default)]
     pub create_if_missing: bool,
+    #[serde(default)]
+    pub max_connections: Option<u32>,
+    #[serde(default)]
+    pub min_connections: Option<u32>,
 }
 
 // struct type to represent rate limiting settings
@@ -158,6 +162,8 @@ impl DatabaseSettings {
     ///     r#type: DatabaseType::Sqlite,
     ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// assert_eq!(config.connection_string(), "sqlite:database.db");
     ///
@@ -165,6 +171,8 @@ impl DatabaseSettings {
     ///     r#type: DatabaseType::Sqlite,
     ///     url: ":memory:".to_string(),
     ///     create_if_missing: true,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// assert_eq!(memory_config.connection_string(), "sqlite::memory:");
     /// ```

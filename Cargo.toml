@@ -21,6 +21,7 @@ fastbloom-rs = "0.5.10"
 figment = { version = "0.10.19", features = [ "env", "yaml" ] }
 hex = "0.4.3"
 nanoid = "0.4.0"
+num_cpus = "1.17.0"
 parking_lot = "0.12.5"
 serde = { version = "1.0.226", features = ["derive"] }
 serde-aux = "4.7.0"

@@ -34,6 +34,8 @@
 //!    r#type: DatabaseType::Sqlite,
 //!     url: "database.db".to_string(),
 //!     create_if_missing: true,
+//!     max_connections: Some(16),
+//!     min_connections: Some(4),
 //! };
 //! let db = SqliteUrlDatabase::from_config(&config).await?;
 //!
@@ -52,8 +54,12 @@ use crate::configuration::DatabaseSettings;
 use crate::models::{UpsertResult, Urls};
 use async_trait::async_trait;
 use sha2::{Digest, Sha256};
+use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 use std::str::FromStr;
+
+const MAX_CAP: u32 = 64;
+const MIN_CAP: u32 = 1;
 
 /// SQLite implementation of the [`UrlDatabase`] trait.
 ///
@@ -78,6 +84,8 @@ use std::str::FromStr;
 ///     r#type: DatabaseType::Sqlite,
 ///     url: "database.db".to_string(),
 ///     create_if_missing: true,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let db = SqliteUrlDatabase::from_config(&config).await?;
 /// # Ok(())
@@ -137,6 +145,8 @@ impl SqliteUrlDatabase {
     ///     r#type: DatabaseType::Sqlite,
     ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// let db = SqliteUrlDatabase::from_config(&config).await?;
     /// # Ok(())
@@ -169,7 +179,7 @@ impl SqliteUrlDatabase {
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, max_connections: Some(16),  min_connections: Some(4), }; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// db.migrate().await?; // Set up the database schema
     /// # Ok(())
     /// # }
@@ -225,7 +235,7 @@ impl UrlDatabase for SqliteUrlDatabase {
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, max_connections: Some(16),  min_connections: Some(4),}; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// db.insert_url("abc123", "https://example.com").await?;
     /// # Ok(())
     /// # }
@@ -293,7 +303,7 @@ impl UrlDatabase for SqliteUrlDatabase {
     /// use url_shortener_ztm_lib::configuration::DatabaseSettings;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, }; let db = SqliteUrlDatabase::from_config(&config).await?;
+    /// let config = DatabaseSettings { r#type: DatabaseType::Sqlite, url: "database.db".to_string(), create_if_missing: true, max_connections: Some(16),  min_connections: Some(4),}; let db = SqliteUrlDatabase::from_config(&config).await?;
     /// let url = db.get_url("abc123").await?;
     /// println!("Original URL: {}", url);
     /// # Ok(())
@@ -363,12 +373,12 @@ impl UrlDatabase for SqliteUrlDatabase {
     async fn save_bloom_snapshot(&self, name: &str, data: &[u8]) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
-            INSERT INTO bloom_snapshots (name, data, updated_at)
-            VALUES (?1, ?2, CURRENT_TIMESTAMP)
-            ON CONFLICT(name)
-            DO UPDATE SET
-                data = excluded.data,
-                updated_at = CURRENT_TIMESTAMP
+                INSERT INTO bloom_snapshots (name, data, updated_at)
+                VALUES (?1, ?2, CURRENT_TIMESTAMP)
+                ON CONFLICT(name)
+                DO UPDATE SET
+                    data = excluded.data,
+                    updated_at = CURRENT_TIMESTAMP
             "#,
         )
         .bind(name)
@@ -407,6 +417,8 @@ impl UrlDatabase for SqliteUrlDatabase {
 ///     r#type: DatabaseType::Sqlite,
 ///     url: "database.db".to_string(),
 ///     create_if_missing: true,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let pool = get_connection_pool(&config).await?;
 /// # Ok(())
@@ -417,7 +429,16 @@ pub async fn get_connection_pool(config: &DatabaseSettings) -> Result<SqlitePool
         .create_if_missing(config.create_if_missing)
         .foreign_keys(true);
 
-    SqlitePool::connect_with(options).await
+    let cores = num_cpus::get().max(MIN_CAP as usize);
+    let default_max = cores.saturating_mul(2).max(4) as u32; // minimum 4
+    let mut max_conn = config.max_connections.unwrap_or(default_max);
+
+    max_conn = max_conn.clamp(MIN_CAP, MAX_CAP);
+
+    SqlitePoolOptions::new()
+        .max_connections(max_conn)
+        .connect_with(options)
+        .await
 }
 
 fn sha256_bytes(s: &str) -> [u8; 32] {

@@ -36,6 +36,8 @@
 //!     r#type: DatabaseType::Postgres,
 //!     url: "postgres://app:secret@localhost:5432/urlshortener".to_string(),
 //!     create_if_missing: false, // Not used by Postgres connector
+//!     max_connections: Some(16),
+//!     min_connections: Some(4),
 //! };
 //! let db = PostgresUrlDatabase::from_config(&config).await?;
 //!
@@ -64,6 +66,9 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
 };
 use std::str::FromStr;
+
+const MAX_CAP: u32 = 96;
+const MIN_CAP: u32 = 2;
 
 /// PostgreSQL implementation of the [`UrlDatabase`] trait.
 ///
@@ -123,6 +128,8 @@ impl PostgresUrlDatabase {
     ///     r#type: DatabaseType::Postgres,
     ///     url: "postgres://app:secret@localhost:5432/urlshortener".to_string(),
     ///     create_if_missing: false,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// let db = PostgresUrlDatabase::from_config(&config).await?;
     /// # Ok(())
@@ -158,6 +165,8 @@ impl PostgresUrlDatabase {
     ///     r#type: DatabaseType::Postgres,
     ///     url: "postgres://app:secret@localhost:5432/urlshortener".to_string(),
     ///     create_if_missing: false,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// let db = PostgresUrlDatabase::from_config(&config).await?;
     /// db.migrate().await?; // Set up the database schema
@@ -289,12 +298,12 @@ impl UrlDatabase for PostgresUrlDatabase {
     async fn save_bloom_snapshot(&self, name: &str, data: &[u8]) -> Result<(), DatabaseError> {
         sqlx::query(
             r#"
-            INSERT INTO bloom_snapshots (name, data)
-            VALUES ($1, $2)
-            ON CONFLICT (name)
-            DO UPDATE
-            SET data = EXCLUDED.data,
-                updated_at = NOW()
+                INSERT INTO bloom_snapshots (name, data)
+                VALUES ($1, $2)
+                ON CONFLICT (name)
+                DO UPDATE
+                SET data = EXCLUDED.data,
+                    updated_at = NOW()
             "#,
         )
         .bind(name)
@@ -330,6 +339,8 @@ impl UrlDatabase for PostgresUrlDatabase {
 ///     r#type: DatabaseType::Postgres,
 ///     url: "postgres://app:secret@localhost:5432/urlshortener".to_string(),
 ///     create_if_missing: false,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let pool = get_connection_pool(&config).await?;
 /// # Ok(())
@@ -337,9 +348,34 @@ impl UrlDatabase for PostgresUrlDatabase {
 /// ```
 pub async fn get_connection_pool(config: &DatabaseSettings) -> Result<PgPool, SqlxError> {
     let options = PgConnectOptions::from_str(&config.connection_string())?;
+
+    let cores = num_cpus::get().max(1) as u32;
+
+    let default_max = cores.saturating_mul(4);
+    let default_min = cores.saturating_mul(2);
+
+    let mut max_conn = config.max_connections.unwrap_or(default_max);
+    let mut min_conn = config.min_connections.unwrap_or(default_min);
+
+    max_conn = max_conn.clamp(MIN_CAP, MAX_CAP);
+    if min_conn < MIN_CAP {
+        min_conn = MIN_CAP;
+    }
+
+    if min_conn > max_conn {
+        tracing::warn!(
+            requested_min = %min_conn,
+            requested_max = %max_conn,
+            "min_connections > max_connections, adjusting min_connections to max_connections"
+        );
+        min_conn = max_conn;
+    }
+
+    tracing::warn!(cores = %cores, min_connections = %min_conn, max_connections = %max_conn, "Postgres pool sizes");
+
     PgPoolOptions::new()
-        .max_connections(64)
-        .min_connections(16)
+        .max_connections(max_conn)
+        .min_connections(min_conn)
         .connect_with(options)
         .await
 }
@@ -361,7 +397,6 @@ mod tests {
     use super::*;
     use sqlx::PgPool;
     use std::env;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     /// Integration test for `PostgresUrlDatabase`.
     ///
@@ -384,31 +419,28 @@ mod tests {
         db.migrate().await.expect("migrations failed");
 
         // Generate unique test id
-        let id = format!(
-            "test-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("time went backwards")
-                .as_nanos()
-        );
+        let code = "Abc123";
         let url = "https://example.com/test";
 
         // Insert and fetch URL
-        db.insert_url(&id, url).await.expect("insert failed");
-        let fetched = db.get_url(&id).await.expect("get_url failed");
+        db.insert_url(code, url).await.expect("insert failed");
+        let fetched = db.get_url(code).await.expect("get_url failed");
         assert_eq!(fetched, url);
 
         // Check duplicate insert
-        let duplicate = db.insert_url(&id, url).await;
-        assert!(matches!(duplicate, Err(DatabaseError::Duplicate)));
+        let duplicate = db.insert_url(code, url).await.unwrap();
+        assert!(
+            !duplicate.created,
+            "duplicate insert should not create a new record"
+        );
 
         // Check not found
         let missing = db.get_url("this-id-does-not-exist-hopefully").await;
         assert!(matches!(missing, Err(DatabaseError::NotFound)));
 
         // Cleanup
-        sqlx::query("DELETE FROM urls WHERE id = $1")
-            .bind(&id)
+        sqlx::query("DELETE FROM urls WHERE code = $1")
+            .bind(code)
             .execute(&pool)
             .await
             .expect("cleanup failed");

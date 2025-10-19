@@ -453,6 +453,8 @@ impl Application {
 ///     r#type: DatabaseType::Sqlite,
 ///     url: "database.db".to_string(),
 ///     create_if_missing: true,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();

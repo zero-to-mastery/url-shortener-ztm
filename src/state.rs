@@ -71,6 +71,8 @@ use uuid::Uuid;
 ///     r#type: DatabaseType::Sqlite,
 ///     url: "database.db".to_string(),
 ///     create_if_missing: true,
+///     max_connections: Some(16),
+///     min_connections: Some(4),
 /// };
 /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
 /// let api_key = Uuid::new_v4();
@@ -130,6 +132,8 @@ impl AppState {
     ///     r#type: DatabaseType::Sqlite,
     ///     url: "database.db".to_string(),
     ///     create_if_missing: true,
+    ///     max_connections: Some(16),
+    ///     min_connections: Some(4),
     /// };
     /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
     /// let api_key = Uuid::parse_str("e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5")?;
