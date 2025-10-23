@@ -29,6 +29,32 @@ A high-performance URL shortener service built with modern Rust technologies. Th
 - **Development**: Nix flake with Fenix Rust toolchain and pre-commit hooks
 - **Testing**: Comprehensive integration tests with in-memory databases
 
+## 🔒 Security Audit
+
+This project uses `cargo audit` to check for security vulnerabilities. Due to unmaintained dependencies in the `tera` template engine (specifically `unic` crates), some warnings may appear. These are not security vulnerabilities but rather unmaintained crates.
+
+To run the security audit with these warnings ignored, use the provided scripts:
+
+```bash
+# On Unix/Linux/macOS
+./audit.sh
+
+# On Windows
+audit.bat
+```
+
+Or run manually with the ignore flags:
+
+```bash
+cargo audit --deny warnings \
+  --ignore RUSTSEC-2025-0081 \
+  --ignore RUSTSEC-2025-0075 \
+  --ignore RUSTSEC-2025-0080 \
+  --ignore RUSTSEC-2025-0074 \
+  --ignore RUSTSEC-2025-0104 \
+  --ignore RUSTSEC-2025-0098
+```
+
 ## 📡 API Endpoints
 
 ### Shorten a URL
