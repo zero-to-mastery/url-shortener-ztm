@@ -1,6 +1,9 @@
 ## Description
 Brief description of changes
 
+## Issue number
+(#issue number)
+
 ## Type of Change
 - [ ] Bug fix
 - [ ] New feature
