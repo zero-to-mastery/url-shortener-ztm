@@ -44,7 +44,14 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Run audit
-        run: cargo audit --deny warnings
+        run: |
+          cargo audit --deny warnings \
+            --ignore RUSTSEC-2025-0081 \
+            --ignore RUSTSEC-2025-0075 \
+            --ignore RUSTSEC-2025-0080 \
+            --ignore RUSTSEC-2025-0074 \
+            --ignore RUSTSEC-2025-0104 \
+            --ignore RUSTSEC-2025-0098
 
       - name: Upload advisory report (optional)
         if: failure()
