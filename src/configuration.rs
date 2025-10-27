@@ -100,6 +100,8 @@ pub struct ApplicationSettings {
     pub port: u16,
     /// Host address for the HTTP server to bind to
     pub host: String,
+    /// Base URL for the application (e.g., "http://localhost:8000")
+    pub base_url: String,
     /// UUID-based API key for authenticating requests to protected endpoints
     pub api_key: Uuid,
     /// Directory path containing Tera template files

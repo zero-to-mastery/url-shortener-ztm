@@ -38,6 +38,12 @@ prepare-shorten-data:
 prepare-redirect-data:
 	nu ./scripts/prepare_redirect_data.nu
 
+# ── 👀 Watch for changes and auto-restart ────────────────────────
+# Dev watch: rate limiting OFF, log = debug, hot-reloading ON
+watch:
+    @echo "🚀 Starting development watcher... (Ctrl+C to stop) http://localhost:8000"
+    RUST_LOG=debug APP_RATE_LIMITING__ENABLED=false cargo watch -q -c -x run -s "start http://localhost:8000"
+
 # ── 📊 Performance Tests - Shorten ────────────────────────────────
 perf-shorten:
 	#!{{shebang}}
