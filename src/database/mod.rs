@@ -143,7 +143,7 @@ pub trait UrlDatabase: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    async fn insert_url(&self, code: &str, url: &str) -> Result<UpsertResult, DatabaseError>;
+    async fn insert_url(&self, code: &str, url: &str) -> Result<(UpsertResult, Urls), DatabaseError>;
     async fn insert_alias(&self, alias_code: &str, code_id: i64) -> Result<(), DatabaseError>;
     async fn get_id_by_url(&self, url: &str) -> Result<Urls, DatabaseError>;
 
