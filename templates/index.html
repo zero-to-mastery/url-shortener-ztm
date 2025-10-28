@@ -1,83 +1,154 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block content %}
+<section class="hero" aria-labelledby="hero-heading">
+  <div class="hero-content container">
+    <h1 id="hero-heading">
+      <span>Shorten links and track</span>
+      <span>every click.</span>
+    </h1>
 
-{% block content %}
+    <form id="urlForm" class="url-form" aria-label="URL Shortener Form">
+      <label for="urlInput">Add your link</label>
+      <div class="input-group">
+        <input
+          type="url"
+          id="urlInput"
+          name="url"
+          placeholder="https://enter-your-long-url-here.com/..."
+          required
+          autocomplete="url"
+          aria-describedby="url-help"
+        />
+        <button
+          type="submit"
+          id="submitBtn"
+          class="btn btn-primary"
+          aria-describedby="submit-help"
+        >
+          <span class="btn-text">Shrink it</span>
 
-  <div class="container">
-    <header class="hero">
-      <h2>Shorten Your URLs</h2>
-      <p>Create short, shareable links in seconds with our powerful URL shortener</p>
-    </header>
-
-    <main class="url-shortener" role="main">
-      <form id="urlForm" class="url-form" aria-label="URL Shortener Form">
-        <div class="input-group">
-          <label for="urlInput" class="visually-hidden">Enter URL to shorten</label>
-          <input 
-            type="url" 
-            id="urlInput" 
-            name="url"
-            placeholder="Enter your long URL here..." 
-            required 
-            autocomplete="url"
-            aria-describedby="url-help"
-          >
-          <button type="submit" id="submitBtn" class="btn btn-primary" aria-describedby="submit-help">
-            <span class="btn-text">Shorten URL</span>
-            <span class="btn-loading" style="display: none;" aria-hidden="true">
-              <span class="spinner"></span>
-              Shortening...
-            </span>
-          </button>
-        </div>
-        <div id="url-help" class="visually-hidden">Enter a valid URL starting with http:// or https://</div>
-        <div id="submit-help" class="visually-hidden">Click to generate a short URL</div>
-      </form>
-
-      <div id="result" class="result" style="display: none;" role="status" aria-live="polite">
-        <div class="result-content">
-          <div class="result-header">
-            <h3>🎉 Your Short URL is Ready!</h3>
-            <button id="closeResult" class="close-btn" aria-label="Close" role="button">×</button>
-          </div>
-          <div class="result-body">
-            <div class="short-url-container">
-              <label for="shortUrl" class="visually-hidden">Short URL</label>
-              <input type="text" id="shortUrl" readonly class="short-url-input" aria-label="Generated short URL">
-              <button id="copyBtn" class="btn btn-secondary copy-btn" aria-label="Copy short URL to clipboard">
-                <span class="copy-text">Copy</span>
-                <span class="copy-success" style="display: none;" aria-hidden="true">✓ Copied!</span>
-              </button>
-            </div>
-            <div class="original-url">
-              <strong>Original URL:</strong> <span id="originalUrl"></span>
-            </div>
-          </div>
-        </div>
+          <span class="btn-loading hidden" aria-hidden="true">
+            <span class="spinner"></span>
+            Shortening...
+          </span>
+        </button>
       </div>
-
-      <div id="error" class="error" style="display: none;" role="alert" aria-live="assertive">
-        <div class="error-content">
-          <div class="error-header">
-            <h3>⚠️ Error</h3>
-            <button id="closeError" class="close-btn" aria-label="Close" role="button">×</button>
-          </div>
-          <p id="errorMessage"></p>
-          <button id="retryBtn" class="btn btn-secondary">Try Again</button>
-        </div>
+      <div id="url-help" class="visually-hidden">
+        Enter a valid URL starting with http:// or https://
       </div>
-    </main>
-
-    <section class="admin-section">
-      <div class="admin-info">
-        <h3>Admin Access</h3>
-        <p>Manage your shortened URLs and access advanced features</p>
-        <div class="admin-links">
-          <a href="/admin/login" class="btn btn-secondary">Login</a>
-          <a href="/admin/register" class="btn btn-outline">Register</a>
-          <a href="/admin" class="btn btn-primary">Admin Dashboard</a>
-        </div>
+      <div id="submit-help" class="visually-hidden">
+        Click to generate a short URL
       </div>
-    </section>
+    </form>
   </div>
+</section>
+
+<div class="modal-container container">
+  <div id="result" class="result hidden" role="status" aria-live="polite">
+    <h3>🎉 Your Short URL is Ready!</h3>
+    <button id="closeResult" class="close-btn" aria-label="Close">×</button>
+    <div class="short-url-container">
+      <label for="shortUrl" class="visually-hidden">Short URL</label>
+      <input
+        type="text"
+        id="shortUrl"
+        readonly
+        class="short-url-input"
+        aria-label="Generated short URL"
+      />
+      <button
+        id="copyBtn"
+        class="btn btn-secondary copy-btn"
+        aria-label="Copy short URL to clipboard"
+      >
+        <span class="copy-text">Copy</span>
+        <span class="copy-success hidden" aria-hidden="true">✓ Copied!</span>
+      </button>
+    </div>
+    <div class="original-url">
+      <strong>Original URL:</strong> <span id="originalUrl"></span>
+    </div>
+  </div>
+
+  <div id="error" class="error hidden" role="alert" aria-live="assertive">
+    <h3>⚠️ Error</h3>
+    <button id="closeError" class="close-btn" aria-label="Close">×</button>
+    <p id="errorMessage"></p>
+    <button id="retryBtn" class="btn btn-secondary">Try Again</button>
+  </div>
+</div>
+
+<section class="features" aria-labelledby="features-heading">
+  <div class="container">
+    <h2 id="features-heading">Features</h2>
+  </div>
+  <div class="features-carousel">
+    <div class="feature-card-wrapper">
+      <div class="feature-card-side feature-card-side--left"></div>
+      <article class="feature-card-main">
+        <header class="feature-header">
+          <h3>statistics</h3>
+
+          <div class="feature-icon" aria-hidden="true">📊</div>
+        </header>
+        <div class="feature-body">
+          <p>
+            Lorem ipsum dolor sit amet consectetur. Amet ornare pharetra ut ac
+            vitae in facilisis aliquet tellus. Aliquet diam pellentesque
+            dignissim risus magna massa pharetra turpis.
+          </p>
+        </div>
+      </article>
+      <div class="feature-card-side feature-card-side--right"></div>
+    </div>
+    <div class="container">
+      <div class="carousel-dots" role="tablist" aria-label="Features carousel">
+        <button
+          role="tab"
+          class="dot active"
+          aria-selected="true"
+          aria-label="Show feature 1"
+        ></button>
+        <button
+          role="tab"
+          class="dot"
+          aria-selected="false"
+          aria-label="Show feature 2"
+        ></button>
+        <button
+          role="tab"
+          class="dot"
+          aria-selected="false"
+          aria-label="Show feature 3"
+        ></button>
+        <button
+          role="tab"
+          class="dot"
+          aria-selected="false"
+          aria-label="Show feature 4"
+        ></button>
+        <button
+          role="tab"
+          class="dot"
+          aria-selected="false"
+          aria-label="Show feature 5"
+        ></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="admin-section hidden" aria-labelledby="admin-heading">
+  <div class="container">
+    <div class="admin-info">
+      <h2 id="admin-heading">Admin Access</h2>
+      <p>Manage your shortened URLs and access advanced features</p>
+      <div class="admin-links">
+        <a href="/admin/login" class="btn btn-secondary">Login</a>
+        <a href="/admin/register" class="btn btn-outline">Register</a>
+        <a href="/admin" class="btn btn-primary">Admin Dashboard</a>
+      </div>
+    </div>
+  </div>
+</section>
 
 {% endblock content %}
