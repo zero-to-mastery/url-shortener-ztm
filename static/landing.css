@@ -575,26 +575,30 @@ img {
 /* ============================================
    11. FEATURES SECTION
    ============================================ */
+.main-content-wrapper {
+  position: relative;
+  padding-bottom: var(--spacing-l);
+}
+
+.main-content-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 22.5%;
+  left: -10%;
+  width: 120%;
+  height: 26%;
+  background: linear-gradient(1.88deg,
+      var(--color-surface-dark-start) -5.15%,
+      var(--color-surface-dark-end) 89.22%);
+  transform: skewY(17deg);
+  z-index: -1;
+}
 
 .features {
   padding-block: var(--spacing-l);
   position: relative;
   overflow: hidden;
   z-index: 1;
-}
-
-.features::before {
-  content: "";
-  position: absolute;
-  top: 40%;
-  left: -10%;
-  width: 120%;
-  height: 40%;
-  background: linear-gradient(1.88deg,
-      var(--color-surface-dark-start) -5.15%,
-      var(--color-surface-dark-end) 89.22%);
-  transform: skewY(17deg);
-  z-index: -1;
 }
 
 .features h2 {
