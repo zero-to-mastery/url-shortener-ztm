@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="Shorten your URLs quickly and securely. Create short, shareable links in seconds with our powerful URL shortener." />
+  <meta name="keywords" content="URL shortener, link shortener, short links, URL compression, link management" />
+  <meta name="author" content="Jeffery D Mitchell" />
+  <link rel="stylesheet" type="text/css" href="/static/admin.css" media="screen" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="icon" type="image/x-icon" href="/static/logo-dark.png" />
+  <title>{{ title }} | {{ page }}</title>
+</head>
+
+<body>
+  <header class="site-header" role="banner">
+    <div class="container">
+      <nav class="nav" role="navigation" aria-label="Main navigation">
+        <a href="/" class="nav-brand" aria-label="Linkly Homepage">
+          <img src="../static/logo-dark.png" alt="" class="logo-icon" aria-hidden="true" />
+          <span class="brand-name">Linkly</span>
+        </a>
+        <a href="/admin" id="adminNavLink" class="btn btn-primary admin-btn hidden">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <main role="main">{% block content %}{% endblock content %}</main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-copyright">
+        <p>
+          &copy; <span id="year"></span><noscript>2025</noscript> Linkly | All
+          Rights Reserved
+        </p>
+      </div>
+    </div>
+  </footer>
+  <script type="module" src="/static/scripts.js"></script>
+</body>
+
+</html>
