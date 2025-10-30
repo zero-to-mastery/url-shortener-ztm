@@ -210,7 +210,11 @@ pub async fn post_shorten(
     };
 
     tracing::info!("URL shortened and saved successfully");
-    Ok(make_response(&state.config.application.base_url, &final_code, &norm))
+    Ok(make_response(
+        &state.config.application.base_url,
+        &final_code,
+        &norm,
+    ))
 }
 
 /// Parses and normalizes a URL:
