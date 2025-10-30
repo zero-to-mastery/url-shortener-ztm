@@ -17,8 +17,8 @@ application:
   api_key: "e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5"
   templates: "templates/**/*"
 database:
-  type: sqlite
-  url: sqlite:database.db
+  type: postgres
+  url: postgres://app:secret@localhost:5432/urlshortener
   create_if_missing: true
   # max_connections: 64 # set database pool connecttion
   # min_connections: 16

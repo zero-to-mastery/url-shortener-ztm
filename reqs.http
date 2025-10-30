@@ -1,0 +1,23 @@
+###
+@base = http://localhost:8000
+
+### ### Sign up a user
+POST {{base}}/api/v1/auth/sign-up
+Content-Type: application/json
+
+{
+  "email": "example@example.com",
+  "password": "123456789"
+}
+
+### Sign in
+POST {{base}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{
+  "email": "example@example.com",
+  "password": "123456789"
+}
+
+### Get current user info test access token
+GET {{base}}/api/v1/user/me

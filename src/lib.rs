@@ -73,8 +73,10 @@
 
 // Module declarations
 pub mod configuration;
+pub mod core;
 pub mod database;
 pub mod errors;
+pub mod features;
 pub mod generator;
 pub mod middleware;
 pub mod models;
@@ -85,6 +87,8 @@ pub mod startup;
 pub mod state;
 pub mod telemetry;
 pub mod templates;
+
+pub mod infrastructure;
 
 // Re-exports for convenience
 pub use configuration::*;

@@ -48,14 +48,23 @@
 //! ```
 
 use crate::configuration::Settings;
+use crate::core::extractors::auth_user::{self, AuthCtx};
+use crate::core::security::jwt::JwtKeys;
 use crate::database::postgres_sql::PostgresUrlDatabase;
 use crate::database::{SqliteUrlDatabase, UrlDatabase};
+use crate::features::auth::controllers::AuthController;
+use crate::features::auth::routes as auth;
+use crate::features::auth::services::AuthService;
+use crate::features::users;
+use crate::features::users::services::UserService;
 use crate::generator::build_generator;
+use crate::infrastructure::db::{self, RepoSet};
 use crate::middleware::check_api_key;
 use crate::routes::{
     get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
     health_check, post_shorten, serve_openapi_spec, serve_swagger_ui,
 };
+use tokio::time::Duration as TokioDuration;
 
 use crate::shortcode::bloom_filter::{
     S2L_SNAPSHOT_KEY, build_bloom_state, not_disable_bf_snapshots,
@@ -73,8 +82,8 @@ use axum::{
 };
 use std::collections::HashSet;
 
+use chrono::Duration;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tower::ServiceBuilder;
@@ -236,6 +245,7 @@ impl Application {
                 Arc::new(db) as Arc<dyn UrlDatabase>
             }
         };
+
         let code_generator = build_generator(&config.shortener);
 
         let allowed_chars: HashSet<char> = {
@@ -250,6 +260,19 @@ impl Application {
         };
 
         let blooms = build_bloom_state(&database).await.unwrap();
+
+        let db_pool = db::make_pools(&config.database).await?;
+        let repos = db::make_repos(&db_pool).await;
+
+        let auth_service = Arc::new(AuthService::new(
+            repos.users.clone(),
+            repos.auth.clone(),
+            JwtKeys::new(config.application.api_key.as_bytes()),
+            Duration::minutes(15),
+            config.application.api_key.to_string(),
+        ));
+
+        let user_service = Arc::new(UserService::new(repos.users.clone()));
 
         // Set up the TCP listener and application state
         let api_key = config.application.api_key;
@@ -267,10 +290,12 @@ impl Application {
             api_key,
             template_dir,
             config,
+            auth_service,
+            user_service,
         );
 
         // Build the application router, passing in the application state
-        let router = build_router(state.clone())
+        let router = build_router(state.clone(), repos)
             .await
             .context("Failed to create the application router.")?;
 
@@ -279,7 +304,7 @@ impl Application {
 
         if not_disable_bf_snapshots() {
             tokio::spawn(async move {
-                let mut ticker = tokio::time::interval(Duration::from_secs(60 * 5)); // 5min
+                let mut ticker = tokio::time::interval(Duration::minutes(5).to_std().unwrap());
                 loop {
                     ticker.tick().await;
                     let snapshot = match blooms.s2l.snapshot() {
@@ -465,7 +490,7 @@ impl Application {
 /// # Ok(())
 /// # }
 /// ```
-pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
+pub async fn build_router(state: AppState, repos: RepoSet) -> Result<Router, anyhow::Error> {
     // Define the tracing layer for request/response logging
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(|req: &Request<_>| {
@@ -488,7 +513,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
                 req.headers()
             );
         })
-        .on_response(|res: &Response<_>, latency: Duration, _span: &Span| {
+        .on_response(|res: &Response<_>, latency: TokioDuration, _span: &Span| {
             tracing::info!(
                 "\nresponse:\n  status: {}\n  elapsed_ms: {}\n  headers:\n{:#?}",
                 res.status(),
@@ -510,7 +535,7 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
 
         // Start background cleanup task
         let governor_limiter = governor_conf.limiter().clone();
-        let interval = Duration::from_secs(60);
+        let interval = TokioDuration::from_secs(60);
         tokio::spawn(async move {
             let mut cleanup_interval = tokio::time::interval(interval);
             loop {
@@ -559,6 +584,25 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .route("/admin/register", get(get_register));
     // TODO: Add session-based auth middleware once implemented
 
+    let auth_ctx = Arc::new(AuthCtx {
+        users: repos.users.clone(),
+        jwt: JwtKeys::new(state.api_key.as_bytes()),
+    });
+
+    let auth_router = auth::router(
+        AuthController {
+            svc: state.auth_service.clone(),
+        },
+        auth_ctx.clone(),
+    );
+
+    let user_router = users::router(
+        users::controllers::UserController {
+            svc: state.user_service.clone(),
+        },
+        auth_ctx.clone(),
+    );
+
     // Merge all routes together
     let router = Router::new()
         .merge(public_routes)
@@ -566,6 +610,8 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .merge(protected_api)
         .merge(protected_admin)
         .with_state(state)
+        .nest("/api/v1/auth", auth_router)
+        .nest("/api/v1/user", user_router)
         .layer(
             ServiceBuilder::new()
                 .layer(SetRequestIdLayer::new(

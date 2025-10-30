@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO bloom_snapshots (name, data)\n                VALUES ($1, $2)\n                ON CONFLICT (name)\n                DO UPDATE\n                SET data = EXCLUDED.data,\n                    updated_at = NOW()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7cbd885b2b34cd73dc58a0382fc1902aafb8d2e00571f967bb2c7379779ef17b"
+}

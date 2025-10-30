@@ -32,6 +32,9 @@
 
 use crate::configuration::Settings;
 use crate::database::UrlDatabase;
+
+use crate::features::auth::services::AuthService;
+use crate::features::users::services::UserService;
 use crate::generator::ShortCodeGenerator;
 use crate::shortcode::bloom_filter::BloomState;
 use axum_macros::FromRef;
@@ -98,6 +101,9 @@ pub struct AppState {
     /// Directory path containing Tera template files for web interface
     pub template_dir: String,
     pub config: Settings,
+
+    pub auth_service: Arc<AuthService>,
+    pub user_service: Arc<UserService>,
 }
 
 impl AppState {
@@ -152,6 +158,8 @@ impl AppState {
         api_key: Uuid,
         template_dir: String,
         config: Settings,
+        auth_service: Arc<AuthService>,
+        user_service: Arc<UserService>,
     ) -> Self {
         Self {
             database,
@@ -161,6 +169,8 @@ impl AppState {
             template_dir,
             api_key,
             config,
+            auth_service,
+            user_service,
         }
     }
 }
