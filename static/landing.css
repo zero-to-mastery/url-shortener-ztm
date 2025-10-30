@@ -578,6 +578,7 @@ img {
 .main-content-wrapper {
   position: relative;
   padding-bottom: var(--spacing-l);
+  overflow: hidden;
 }
 
 .main-content-wrapper::before {
