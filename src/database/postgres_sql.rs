@@ -208,7 +208,11 @@ impl UrlDatabase for PostgresUrlDatabase {
     ///
     /// * `id` - The short identifier for the URL
     /// * `url` - The original URL to store
-    async fn insert_url(&self, code: &str, url: &str) -> Result<(UpsertResult, Urls), DatabaseError> {
+    async fn insert_url(
+        &self,
+        code: &str,
+        url: &str,
+    ) -> Result<(UpsertResult, Urls), DatabaseError> {
         // First, call the existing SQL function to either insert the URL or get the ID if it exists.
         let upsert_result: UpsertResult = sqlx::query_as("SELECT * FROM upsert_url($1, $2)")
             .bind(code)
@@ -225,7 +229,10 @@ impl UrlDatabase for PostgresUrlDatabase {
 
         // If a new record was created, the code is the one we just generated.
         if upsert_result.created {
-            let urls = Urls { id: upsert_result.id, code: code.to_string() };
+            let urls = Urls {
+                id: upsert_result.id,
+                code: code.to_string(),
+            };
             return Ok((upsert_result, urls));
         }
 
@@ -235,7 +242,7 @@ impl UrlDatabase for PostgresUrlDatabase {
             .fetch_one(&self.pool)
             .await
             .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-        
+
         Ok((upsert_result, existing_urls))
     }
 

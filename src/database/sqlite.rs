@@ -240,7 +240,11 @@ impl UrlDatabase for SqliteUrlDatabase {
     /// # Ok(())
     /// # }
     /// ```
-    async fn insert_url(&self, code: &str, url: &str) -> Result<(UpsertResult, Urls), DatabaseError> {
+    async fn insert_url(
+        &self,
+        code: &str,
+        url: &str,
+    ) -> Result<(UpsertResult, Urls), DatabaseError> {
         let hash = sha256_bytes(url);
 
         let inserted: Option<(i64,)> = sqlx::query_as(
@@ -268,18 +272,25 @@ impl UrlDatabase for SqliteUrlDatabase {
         })?;
 
         if let Some((id,)) = inserted {
-            let urls = Urls { id, code: code.to_string() };
+            let urls = Urls {
+                id,
+                code: code.to_string(),
+            };
             let upsert_result = UpsertResult { id, created: true };
             return Ok((upsert_result, urls));
         }
 
-        let existing_urls: Urls = sqlx::query_as(r#"SELECT id, code FROM urls WHERE url_hash = ?1 LIMIT 1"#)
-            .bind(&hash[..])
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        let existing_urls: Urls =
+            sqlx::query_as(r#"SELECT id, code FROM urls WHERE url_hash = ?1 LIMIT 1"#)
+                .bind(&hash[..])
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-        let upsert_result = UpsertResult { id: existing_urls.id, created: false };
+        let upsert_result = UpsertResult {
+            id: existing_urls.id,
+            created: false,
+        };
         Ok((upsert_result, existing_urls))
     }
 
