@@ -53,8 +53,8 @@ use crate::database::{SqliteUrlDatabase, UrlDatabase};
 use crate::generator::build_generator;
 use crate::middleware::check_api_key;
 use crate::routes::{
-    get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
-    health_check, post_shorten, serve_openapi_spec, serve_swagger_ui, get_users, get_urls, get_analytics,
+    get_admin_dashboard, get_analytics, get_index, get_login, get_redirect, get_register, get_urls,
+    get_user_profile, get_users, health_check, post_shorten, serve_openapi_spec, serve_swagger_ui,
 };
 
 use crate::shortcode::bloom_filter::{
