@@ -2,45 +2,66 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description"
-    content="Shorten your URLs quickly and securely. Create short, shareable links in seconds with our powerful URL shortener." />
-  <meta name="keywords" content="URL shortener, link shortener, short links, URL compression, link management" />
-  <meta name="author" content="Jeffery D Mitchell" />
-  <link rel="stylesheet" type="text/css" href="/static/admin.css" media="screen" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="icon" type="image/x-icon" href="/static/logo-dark.png" />
-  <title>{{ title }} | {{ page }}</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="Shorten your URLs quickly and securely. Create short, shareable links in seconds with our powerful URL shortener." />
+    <meta name="keywords" content="URL shortener, link shortener, short links, URL compression, link management" />
+    <meta name="author" content="Jeffery D Mitchell" />
+    <link rel="stylesheet" type="text/css" href="/static/admin.css" media="screen" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="icon" type="image/x-icon" href="/static/logo-dark.png" />
+    <title>{{ title | default(value="Admin") }} | {{ page | default(value="Linkly") }}</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@600;700&family=Alegreya:wght@700&family=Plus+Jakarta+Sans:wght@600;700&display=swap"
+        rel="stylesheet">
+    <!-- Chart.js library for rendering analytics charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body>
-  <header class="site-header" role="banner">
-    <div class="container">
-      <nav class="nav" role="navigation" aria-label="Main navigation">
-        <a href="/" class="nav-brand" aria-label="Linkly Homepage">
-          <img src="../static/logo-dark.png" alt="" class="logo-icon" aria-hidden="true" />
-          <span class="brand-name">Linkly</span>
-        </a>
-        <a href="/admin" id="adminNavLink" class="btn btn-primary admin-btn hidden">Admin</a>
-      </nav>
-    </div>
-  </header>
+<body class="admin-body">
 
-  <main role="main">{% block content %}{% endblock content %}</main>
+    {% if hide_nav %}
+    <!-- This block is for auth pages like login/register that don't need navigation -->
+    {% block content %}{% endblock content %}
+    {% else %}
+    <!-- Main layout for dashboard, profile, etc. -->
+    <div class="admin-layout">
+        <aside class="admin-sidebar" id="admin-sidebar">
+            <div class="sidebar-header">
+                <a href="/" class="brand-name">Linkly</a>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="/admin">Dashboard</a></li>
+                    <li><a href="/admin/profile">Profile</a></li>
+                    <li><a href="/admin/urls">Manage URLs</a></li>
+                    <li><a href="/admin/users">Manage Users</a></li>
+                    <li><a href="/admin/analytics">Analytics</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/">← Back to Home</a>
+            </div>
+        </aside>
+        <main class="admin-content">
+            {% block page_header %}
+            <header class="admin-header">
+                <h1>{{ title | default(value="Dashboard") }}</h1>
+                <button class="hamburger-button" id="hamburger-button" aria-label="Toggle menu">☰</button>
+            </header>
+            {% endblock page_header %}
 
-  <footer class="site-footer" role="contentinfo">
-    <div class="container">
-      <div class="footer-copyright">
-        <p>
-          &copy; <span id="year"></span><noscript>2025</noscript> Linkly | All
-          Rights Reserved
-        </p>
-      </div>
+            {% block content %}{% endblock content %}
+        </main>
+        <!-- Overlay for mobile sidebar -->
+        <div id="content-overlay" class="content-overlay"></div>
     </div>
-  </footer>
-  <script type="module" src="/static/scripts.js"></script>
+    {% endif %}
+
+    <!-- Admin JavaScript file containing client-side functionality -->
+    <script type="module" src="/static/admin.js"></script>
 </body>
 
 </html>

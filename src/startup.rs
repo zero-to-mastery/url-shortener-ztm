@@ -54,7 +54,7 @@ use crate::generator::build_generator;
 use crate::middleware::check_api_key;
 use crate::routes::{
     get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
-    health_check, post_shorten, serve_openapi_spec, serve_swagger_ui,
+    health_check, post_shorten, serve_openapi_spec, serve_swagger_ui, get_users, get_urls, get_analytics,
 };
 
 use crate::shortcode::bloom_filter::{
@@ -268,6 +268,9 @@ impl Application {
             template_dir,
             config,
         );
+
+        // Template initialization
+        crate::templates::build_templates(state.clone()).expect("Failed to build templates");
 
         // Build the application router, passing in the application state
         let router = build_router(state.clone())
@@ -556,7 +559,10 @@ pub async fn build_router(state: AppState) -> Result<Router, anyhow::Error> {
         .route("/admin", get(get_admin_dashboard))
         .route("/admin/profile", get(get_user_profile))
         .route("/admin/login", get(get_login))
-        .route("/admin/register", get(get_register));
+        .route("/admin/register", get(get_register))
+        .route("/admin/users", get(get_users))
+        .route("/admin/urls", get(get_urls))
+        .route("/admin/analytics", get(get_analytics));
     // TODO: Add session-based auth middleware once implemented
 
     // Merge all routes together

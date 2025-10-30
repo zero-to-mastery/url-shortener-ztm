@@ -1,61 +1,29 @@
 {% extends "base_admin.html" %}
+{% set hide_nav = true %} {# This tells the base template to hide the nav bars #}
 
 {% block content %}
-<div class="container">
-  <div class="auth-container">
+<!-- Auth Layout - Wrapper for authentication forms -->
+<div class="auth-layout">
+    <!-- Auth Card - Main login form container -->
     <div class="auth-card">
-      <h2>Login</h2>
-      <p>{{ message }}</p>
-      
-      <form class="auth-form" id="loginForm">
-        <div class="form-group">
-          <label for="username">Username or Email:</label>
-          <input type="text" id="username" name="username" required>
-        </div>
-        
-        <div class="form-group">
-          <label for="password">Password:</label>
-          <input type="password" id="password" name="password" required>
-        </div>
-        
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" name="remember" id="remember">
-            Remember me
-          </label>
-        </div>
-        
-        <button type="submit" class="btn primary full-width">Login</button>
-      </form>
-      
-      <div class="auth-links">
-        <p>Don't have an account? <a href="/admin/register">Register here</a></p>
-        <p><a href="/admin/forgot-password">Forgot your password?</a></p>
-      </div>
-    </div>
-  </div>
-  
-  <div class="auth-actions">
-    <a href="/" class="btn secondary">Back to Home</a>
-  </div>
-</div>
+        <h2>Sign In</h2>
 
-<script>
-document.getElementById('loginForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    // Get form data
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    
-    // Basic validation (replace with actual authentication)
-    if (username && password) {
-        alert('Login functionality will be implemented with backend authentication');
-        // In a real implementation, this would make an API call to authenticate
-        // and redirect to the admin dashboard on success
-    } else {
-        alert('Please fill in all fields');
-    }
-});
-</script>
+        <!-- Form message container for displaying login status -->
+        <div id="form-message" class="form-message" role="alert" aria-live="polite" style="display: none;"></div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Login</button>
+        </form>
+        <p style="text-align: center; margin-top: 1rem;">
+            No account? <a href="/admin/register">Register here</a>
+        </p>
+    </div>
+</div>
 {% endblock content %}

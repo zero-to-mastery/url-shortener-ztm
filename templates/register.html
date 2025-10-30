@@ -1,91 +1,32 @@
 {% extends "base_admin.html" %}
+{% set hide_nav = true %} {# This tells the base template to hide the nav bars #}
 
 {% block content %}
-<div class="container">
-  <div class="auth-container">
+<!-- Auth Layout - Wrapper for authentication forms -->
+<div class="auth-layout">
+    <!-- Auth Card - Main registration form container -->
     <div class="auth-card">
-      <h2>Register</h2>
-      <p>{{ message }}</p>
-      
-      <form class="auth-form" id="registerForm">
-        <div class="form-group">
-          <label for="username">Username:</label>
-          <input type="text" id="username" name="username" required minlength="3">
-          <small>Minimum 3 characters</small>
-        </div>
-        
-        <div class="form-group">
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" required>
-        </div>
-        
-        <div class="form-group">
-          <label for="password">Password:</label>
-          <input type="password" id="password" name="password" required minlength="8">
-          <small>Minimum 8 characters</small>
-        </div>
-        
-        <div class="form-group">
-          <label for="confirmPassword">Confirm Password:</label>
-          <input type="password" id="confirmPassword" name="confirmPassword" required>
-        </div>
-        
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" name="terms" id="terms" required>
-            I agree to the <a href="/terms" target="_blank">Terms of Service</a>
-          </label>
-        </div>
-        
-        <button type="submit" class="btn primary full-width">Create Account</button>
-      </form>
-      
-      <div class="auth-links">
-        <p>Already have an account? <a href="/admin/login">Login here</a></p>
-      </div>
+        <h2>Create Account</h2>
+        <!-- Form message container for displaying registration status -->
+        <div id="form-message" class="form-message" role="alert" aria-live="polite" style="display: none;"></div>
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Register</button>
+        </form>
+        <p style="text-align: center; margin-top: 1rem;">
+            Already have an account? <a href="/admin/login">Sign in</a>
+        </p>
     </div>
-  </div>
-  
-  <div class="auth-actions">
-    <a href="/" class="btn secondary">Back to Home</a>
-  </div>
 </div>
-
-<script>
-document.getElementById('registerForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    // Get form data
-    const username = document.getElementById('username').value;
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const confirmPassword = document.getElementById('confirmPassword').value;
-    const terms = document.getElementById('terms').checked;
-    
-    // Validation
-    if (!username || !email || !password || !confirmPassword) {
-        alert('Please fill in all fields');
-        return;
-    }
-    
-    if (password !== confirmPassword) {
-        alert('Passwords do not match');
-        return;
-    }
-    
-    if (password.length < 8) {
-        alert('Password must be at least 8 characters long');
-        return;
-    }
-    
-    if (!terms) {
-        alert('Please accept the Terms of Service');
-        return;
-    }
-    
-    alert('Registration functionality will be implemented with backend user management');
-    // In a real implementation, this would make an API call to create the user
-    // and redirect to login or admin dashboard on success
-});
-</script>
 {% endblock content %}

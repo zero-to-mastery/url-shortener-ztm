@@ -156,3 +156,9 @@ pub fn build_templates(state: AppState) -> Result<&'static Tera, Error> {
     let templates = load_templates(dir)?;
     Ok(COMPILED_TEMPLATES.get_or_init(|| templates))
 }
+
+/// Returns a reference to the globally cached Tera instance.
+/// Panics if templates have not been initialized by calling `build_templates` first.
+pub fn get_templates() -> &'static Tera {
+    COMPILED_TEMPLATES.get().expect("Templates have not been initialized")
+}

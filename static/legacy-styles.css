@@ -1,0 +1,202 @@
+/* ==========================================================================
+   DESIGN TOOLKIT & REFERENCE STYLES
+   ==========================================================================
+   This file contains valuable and reusable CSS patterns from the project's
+   previous design. It is not linked to any page but serves as an archive
+   of useful code for future features or projects.
+*/
+
+
+/* ==========================================================================
+   1. COMPLETE DARK MODE THEME
+   ==========================================================================
+   This is a fully functional dark mode theme that can be adapted for the
+   admin panel or the landing page in the future. It works by overriding
+   the CSS custom properties defined in the :root selector.
+*/
+
+/*
+-- HOW TO USE --
+1. Copy the variables from the old :root into your target CSS file.
+2. Add this entire @media block to your target CSS file.
+3. This will automatically apply the theme when the user's OS is in dark mode.
+*/
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Main Backgrounds */
+    --background: #0f172a; /* Dark blue-gray, great for main page BG */
+    --surface: #1e293b;    /* Slightly lighter, for cards and panels */
+    --surface-elevated: #334155; /* For modals or elements that need to stand out */
+
+    /* "Glassmorphism" Effect for Dark Mode */
+    --glass-bg: rgba(30, 41, 59, 0.2); /* Semi-transparent dark surface */
+    --glass-border: rgba(255, 255, 255, 0.15); /* Subtle white border for glass effect */
+
+    /* Text Colors for Dark Backgrounds */
+    --text-primary: #f1f5f9;   /* Off-white for main text */
+    --text-secondary: #94a3b8; /* Muted gray for secondary text */
+    --text-muted: #64748b;     /* Even more muted, for tertiary info */
+
+    /* Borders for Dark Mode */
+    --border: #334155;
+    --border-hover: #475569;
+  }
+}
+
+
+/* ==========================================================================
+   2. "GLASSMORPHISM" & ANIMATED GRADIENT BACKGROUND
+   ==========================================================================
+   These styles create a modern, visually engaging background with floating
+   radial gradients and semi-transparent "glass" panels. Excellent for
+   public-facing landing pages.
+*/
+
+/*
+-- HOW TO USE --
+1. Apply the 'background: var(--gradient-bg)' and related styles to your `body`.
+2. The `body::before` pseudo-element will automatically create the animated effect.
+3. Use `--glass-bg` and `--glass-border` on elements you want to look like glass.
+*/
+
+/* --- Animated Gradient Body Background --- */
+body.gradient-animated-bg {
+  /* You would need to define --gradient-bg in your :root */
+  /* Example: --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%); */
+  background: var(--gradient-bg);
+  background-attachment: fixed;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body.gradient-animated-bg::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+  animation: backgroundFloat 20s ease-in-out infinite;
+  z-index: -1;
+}
+
+@keyframes backgroundFloat {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-20px) rotate(1deg); }
+  66% { transform: translateY(10px) rotate(-1deg); }
+}
+
+/* --- Glass Panel Style --- */
+.glass-panel {
+  /* You would need to define --glass-bg and --glass-border */
+  /* Example: --glass-bg: rgba(255, 255, 255, 0.15); */
+  /* Example: --glass-border: rgba(255, 255, 255, 0.2); */
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px); /* This creates the frosted glass effect */
+  border: 1px solid var(--glass-border);
+  border-radius: 1.5rem; /* --radius-xl */
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* --shadow-xl */
+}
+
+
+/* ==========================================================================
+   3. ADVANCED BUTTON STYLES (HOVER GLOW & SHINE ANIMATION)
+   ==========================================================================
+   These styles provide more visual feedback on buttons, making them feel
+   more interactive. Great for primary call-to-action buttons.
+*/
+
+/*
+-- HOW TO USE --
+1. Add the `.btn-advanced` class to a button.
+2. Ensure you have defined `--shadow-xl` and `--shadow-glow` variables.
+*/
+
+.btn-advanced {
+  position: relative; /* Required for the shine pseudo-element */
+  overflow: hidden;   /* Keeps the shine effect contained */
+  transition: all 0.3s ease-in-out;
+}
+
+/* --- Hover Glow Effect --- */
+.btn-advanced:hover:not(:disabled) {
+  transform: translateY(-3px);
+  /* You would need to define --shadow-xl and --shadow-glow */
+  /* Example: --shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.25); */
+  /* Example: --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3); */
+  box-shadow: var(--shadow-xl), var(--shadow-glow);
+}
+
+/* --- Shine Animation on Hover --- */
+.btn-advanced::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease-in-out;
+}
+
+.btn-advanced:hover::before {
+  left: 100%;
+}
+
+
+/* ==========================================================================
+   4. RESPONSIVE CARD-BASED TABLE FOR MOBILE
+   ==========================================================================
+   This is a very useful pattern for making complex data tables readable on
+   small screens. It transforms each table row into a card.
+*/
+
+/*
+-- HOW TO USE --
+1. Use a standard HTML table structure.
+2. In your JS, when the screen is small, you can add the `data-label` attribute
+   to each `<td>` to provide the label for the card view.
+3. Apply these media query styles.
+*/
+
+@media (max-width: 768px) {
+  .responsive-table-cards thead {
+    display: none; /* Hide the table header on mobile */
+  }
+
+  .responsive-table-cards tr {
+    display: block;
+    border: 1px solid #e2e8f0; /* var(--border) */
+    border-radius: 0.75rem; /* var(--radius) */
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); /* var(--shadow) */
+    background: #ffffff; /* var(--surface) */
+  }
+
+  .responsive-table-cards td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0; /* var(--border) */
+    text-align: right;
+  }
+
+  .responsive-table-cards tr td:last-child {
+    border-bottom: none;
+  }
+
+  /* Use the 'data-label' attribute to create a label for each data point */
+  .responsive-table-cards td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #1e293b; /* var(--text-primary) */
+    text-align: left;
+    padding-right: 1rem;
+  }
+}
