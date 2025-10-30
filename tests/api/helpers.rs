@@ -196,15 +196,14 @@ impl TestApp {
         let body_str = body.into();
         // Validate the URL using normalize_url function
         match normalize_url(&body_str) {
-            Ok(_) => {
-                self.client
-                    .post(self.api(path))
-                    .header("x-api-key", self.api_key.to_string())
-                    .body(body_str)
-                    .send()
-                    .await
-                    .expect("Failed to execute POST request")
-            }
+            Ok(_) => self
+                .client
+                .post(self.api(path))
+                .header("x-api-key", self.api_key.to_string())
+                .body(body_str)
+                .send()
+                .await
+                .expect("Failed to execute POST request"),
             Err(_) => {
                 // If URL is invalid, return a 422 response
                 self.client

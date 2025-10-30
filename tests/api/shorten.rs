@@ -32,16 +32,16 @@ async fn shorten_endpoint_returns_the_shortened_url_and_200_ok() {
         .and_then(|v| v.as_str())
         .expect("Response should have shortened_url field");
 
-        // Verify the shortened URL format using the configured base_url
-        let expected_prefix = app.base_url; // Use the base_url from the test app
-        let pattern = format!(r"^{}/[A-Za-z0-9]{{7}}$", regex::escape(&expected_prefix));
-        let regex = Regex::new(&pattern).expect("Failed to compile regex");
-        assert!(
-            regex.is_match(shortened_url),
-            "Shortened URL '{}' did not match expected pattern '{}'",
-            shortened_url,
-            pattern
-        );
+    // Verify the shortened URL format using the configured base_url
+    let expected_prefix = app.base_url; // Use the base_url from the test app
+    let pattern = format!(r"^{}/[A-Za-z0-9]{{7}}$", regex::escape(&expected_prefix));
+    let regex = Regex::new(&pattern).expect("Failed to compile regex");
+    assert!(
+        regex.is_match(shortened_url),
+        "Shortened URL '{}' did not match expected pattern '{}'",
+        shortened_url,
+        pattern
+    );
 }
 
 /// Helper function to generate a URL of a specific total length.
@@ -98,7 +98,8 @@ async fn shorten_accepts_url_at_exact_max_length() {
         "Expected shortened URL to start with '{}', but it was '{}'",
         &app.base_url,
         shortened_url
-    );}
+    );
+}
 
 /// Test that URLs exceeding the maximum allowed length (2049+ characters) are rejected
 #[tokio::test]
