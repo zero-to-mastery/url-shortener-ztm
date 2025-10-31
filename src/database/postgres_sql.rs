@@ -208,8 +208,13 @@ impl UrlDatabase for PostgresUrlDatabase {
     ///
     /// * `id` - The short identifier for the URL
     /// * `url` - The original URL to store
-    async fn insert_url(&self, code: &str, url: &str) -> Result<UpsertResult, DatabaseError> {
-        sqlx::query_as::<_, UpsertResult>("SELECT * FROM upsert_url($1, $2)")
+    async fn insert_url(
+        &self,
+        code: &str,
+        url: &str,
+    ) -> Result<(UpsertResult, Urls), DatabaseError> {
+        // First, call the existing SQL function to either insert the URL or get the ID if it exists.
+        let upsert_result: UpsertResult = sqlx::query_as("SELECT * FROM upsert_url($1, $2)")
             .bind(code)
             .bind(url)
             .fetch_one(&self.pool)
@@ -220,7 +225,25 @@ impl UrlDatabase for PostgresUrlDatabase {
                 } else {
                     DatabaseError::QueryError(e.to_string())
                 }
-            })
+            })?;
+
+        // If a new record was created, the code is the one we just generated.
+        if upsert_result.created {
+            let urls = Urls {
+                id: upsert_result.id,
+                code: code.to_string(),
+            };
+            return Ok((upsert_result, urls));
+        }
+
+        // If the URL already existed, we need to fetch the original code associated with it.
+        let existing_urls: Urls = sqlx::query_as("SELECT id, code FROM urls WHERE id = $1")
+            .bind(upsert_result.id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
+        Ok((upsert_result, existing_urls))
     }
 
     /// Retrieves a URL by its short ID from the PostgreSQL database.
@@ -428,9 +451,9 @@ mod tests {
         assert_eq!(fetched, url);
 
         // Check duplicate insert
-        let duplicate = db.insert_url(code, url).await.unwrap();
+        let (duplicate_result, _) = db.insert_url(code, url).await.unwrap();
         assert!(
-            !duplicate.created,
+            !duplicate_result.created,
             "duplicate insert should not create a new record"
         );
 

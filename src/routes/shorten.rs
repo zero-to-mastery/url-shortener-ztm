@@ -281,7 +281,7 @@ async fn insert_with_retry(
         })?;
 
         match state.database.insert_url(code.as_str(), norm_url).await {
-            Ok(upset) => return Ok((upset, code)),
+            Ok((upsert, urls)) => return Ok((upsert, urls.code)),
             Err(DatabaseError::Duplicate) => {
                 tracing::warn!("ID collision on attempt {} — retrying", attempt + 1);
                 continue;
