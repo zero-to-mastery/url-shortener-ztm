@@ -76,7 +76,9 @@ ALTER TABLE urls
     ADD COLUMN description TEXT;
 
 ALTER TABLE aliases
-    ADD COLUMN created_by UUID REFERENCES users(id) ON DELETE SET NULL;
-
+    ADD COLUMN created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    ADD COLUMN password_hash BYTEA,
+    ADD COLUMN expires_at TIMESTAMPTZ,
+    ADD COLUMN description TEXT;
 
 COMMIT;

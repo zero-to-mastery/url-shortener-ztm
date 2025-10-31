@@ -11,7 +11,7 @@ use crate::{
 use sqlx::{PgPool, SqlitePool};
 
 #[derive(Clone)]
-pub enum DbPools {
+pub enum DbPool {
     Postgres(PgPool),
     Sqlite(SqlitePool),
 }
@@ -21,11 +21,12 @@ pub struct RepoSet {
     pub auth: Arc<dyn AuthRepository>,
 }
 
-pub async fn make_pools(cfg: &DatabaseSettings) -> anyhow::Result<DbPools> {
+pub async fn make_pools(cfg: &DatabaseSettings) -> anyhow::Result<DbPool> {
     match cfg.r#type {
         DatabaseType::Postgres => {
             let pool = postgres::get_connection_pool(cfg).await?;
-            Ok(DbPools::Postgres(pool))
+            postgres::migrate(&pool).await?;
+            Ok(DbPool::Postgres(pool))
         } // DatabaseType::Sqlite => {
         //     let pool = crate::database::sqlite::get_connection_pool(cfg).await?;
         //     Ok(DbPools::Sqlite(pool))
@@ -34,16 +35,12 @@ pub async fn make_pools(cfg: &DatabaseSettings) -> anyhow::Result<DbPools> {
     }
 }
 
-pub async fn make_repos(pools: &DbPools) -> RepoSet {
+pub async fn make_repos(pools: &DbPool) -> RepoSet {
     match pools {
-        DbPools::Postgres(pg) => {
-            postgres::migrate(pg).await.unwrap();
-            RepoSet {
-                users: Arc::new(PgUserRepository { pool: pg.clone() }),
-                auth: Arc::new(PgAuthRepository { pool: pg.clone() }),
-                // urls: Arc::new(PgUrlRepository { pool: pg.clone() }),
-            }
-        }
+        DbPool::Postgres(pg) => RepoSet {
+            users: Arc::new(PgUserRepository { pool: pg.clone() }),
+            auth: Arc::new(PgAuthRepository { pool: pg.clone() }),
+        },
         // DbPools::Sqlite(sq) => RepoSet {
         //     users: Arc::new(SqUserRepository { pool: sq.clone() }),
         //     auth: Arc::new(SqAuthRepository { pool: sq.clone() }),

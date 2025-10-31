@@ -5,7 +5,7 @@ use email_address::EmailAddress;
 
 use crate::{
     core::security::{
-        jwt::JwtKeys,
+        jwt::{Claims, JwtKeys},
         password::{hash_password, verify_password},
     },
     features::{
@@ -85,5 +85,24 @@ impl AuthService {
             .sign(usr.id, usr.jwt_token_version, self.access_ttl)?;
 
         Ok(TokenResp { access_token })
+    }
+
+    pub async fn verify_token(&self, token: &str) -> anyhow::Result<Claims> {
+        let claims = self
+            .jwt
+            .verify(token)
+            .map_err(|_| anyhow::anyhow!("Invalid token"))?;
+
+        let user = self
+            .users
+            .find_user_by_id(claims.sub)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("User not found"))?;
+
+        if user.jwt_token_version != claims.ver {
+            return Err(anyhow::anyhow!("Token has been revoked"));
+        }
+
+        Ok(claims)
     }
 }

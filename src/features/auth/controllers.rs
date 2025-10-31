@@ -2,12 +2,21 @@ use std::sync::Arc;
 
 // features/auth/controllers.rs
 use super::{dto::*, services::AuthService};
-use crate::{ApiError, ApiResponse};
+use crate::{ApiError, ApiResponse, AppState};
+use axum::extract::FromRef;
 use axum::{Json, extract::State, response::IntoResponse};
 
 #[derive(Clone)]
 pub struct AuthController {
     pub svc: Arc<AuthService>,
+}
+
+impl FromRef<AppState> for AuthController {
+    fn from_ref(app: &AppState) -> Self {
+        Self {
+            svc: app.auth_service.clone(),
+        }
+    }
 }
 
 pub async fn sign_up(

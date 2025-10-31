@@ -1,13 +1,8 @@
-use std::sync::Arc;
+use crate::AppState;
 
 use super::controllers as c;
-use crate::core::extractors::auth_user::AuthCtx;
-use axum::{Extension, Router, routing::get};
+use axum::{Router, routing::get};
 
-pub fn router(user_ctrl: c::UserController, auth_ctx: Arc<AuthCtx>) -> Router {
-    Router::new()
-        .route("/me", get(c::me))
-        // Add other user routes here
-        .layer(Extension(auth_ctx))
-        .with_state(user_ctrl)
+pub fn router() -> Router<AppState> {
+    Router::new().route("/me", get(c::me))
 }

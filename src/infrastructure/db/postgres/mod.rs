@@ -1,6 +1,6 @@
 pub mod auth;
+// pub mod url;
 pub mod users;
-// pub mod urls;
 
 use sqlx::{
     Error as SqlxError, PgPool,

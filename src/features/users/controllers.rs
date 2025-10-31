@@ -1,18 +1,21 @@
 use crate::core::extractors::auth_user::AuthenticatedUser;
 use crate::features::users::dto::MeResp;
 use crate::features::users::services::UserService;
-use crate::{ApiError, ApiResponse};
-use axum::extract::State;
+use crate::{ApiError, ApiResponse, AppState};
+use axum::extract::{FromRef, State};
 use axum::response::IntoResponse;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct UserController {
-    pub svc: std::sync::Arc<UserService>,
+    pub svc: Arc<UserService>,
 }
 
-impl UserController {
-    pub fn new(svc: std::sync::Arc<UserService>) -> Self {
-        Self { svc }
+impl FromRef<AppState> for UserController {
+    fn from_ref(app: &AppState) -> Self {
+        Self {
+            svc: app.user_service.clone(),
+        }
     }
 }
 

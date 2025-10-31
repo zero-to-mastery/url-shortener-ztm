@@ -48,17 +48,15 @@
 //! ```
 
 use crate::configuration::Settings;
-use crate::core::extractors::auth_user::{self, AuthCtx};
 use crate::core::security::jwt::JwtKeys;
 use crate::database::postgres_sql::PostgresUrlDatabase;
 use crate::database::{SqliteUrlDatabase, UrlDatabase};
-use crate::features::auth::controllers::AuthController;
 use crate::features::auth::routes as auth;
 use crate::features::auth::services::AuthService;
 use crate::features::users;
 use crate::features::users::services::UserService;
-use crate::generator::build_generator;
-use crate::infrastructure::db::{self, RepoSet};
+use crate::generator::{DEFAULT_ALPHABET, build_generator};
+use crate::infrastructure::db::{self};
 use crate::middleware::check_api_key;
 use crate::routes::{
     get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
@@ -66,12 +64,12 @@ use crate::routes::{
 };
 use tokio::time::Duration as TokioDuration;
 
+use crate::DatabaseType;
 use crate::shortcode::bloom_filter::{
     S2L_SNAPSHOT_KEY, build_bloom_state, not_disable_bf_snapshots,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
-use crate::{DatabaseType, generator};
 use anyhow::{Context, Result};
 use axum::http::{Request, Response};
 use axum::{
@@ -188,7 +186,7 @@ pub struct Application {
     /// TCP listener for incoming connections
     listener: TcpListener,
     /// Axum router with all configured routes and middleware
-    router: Router,
+    router: Router<AppState>,
     /// Application state shared across all handlers
     state: AppState,
 }
@@ -231,71 +229,61 @@ impl Application {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn build(config: Settings) -> Result<Self, anyhow::Error> {
-        // set up the database connection pool and run migrations
-        let database: Arc<dyn UrlDatabase> = match config.database.r#type {
+    pub async fn build(cfg: Settings) -> Result<Self, anyhow::Error> {
+        let url_db: Arc<dyn UrlDatabase> = match cfg.database.r#type {
             DatabaseType::Sqlite => {
-                let db = SqliteUrlDatabase::from_config(&config.database).await?;
+                let db = SqliteUrlDatabase::from_config(&cfg.database).await?;
                 db.migrate().await?;
                 Arc::new(db) as Arc<dyn UrlDatabase>
             }
             DatabaseType::Postgres => {
-                let db = PostgresUrlDatabase::from_config(&config.database).await?;
+                let db = PostgresUrlDatabase::from_config(&cfg.database).await?;
                 db.migrate().await?;
                 Arc::new(db) as Arc<dyn UrlDatabase>
             }
         };
 
-        let code_generator = build_generator(&config.shortener);
+        let code_gen = build_generator(&cfg.shortener);
+        let allowed_chars = build_allowed_chars(cfg.shortener.alphabet.as_deref());
 
-        let allowed_chars: HashSet<char> = {
-            let mut set: HashSet<char> = HashSet::new();
-            if let Some(alpha) = &config.shortener.alphabet {
-                set.extend(alpha.chars());
-            } else {
-                set.extend(generator::DEFAULT_ALPHABET);
-            }
-
-            set
-        };
-
-        let blooms = build_bloom_state(&database).await.unwrap();
-
-        let db_pool = db::make_pools(&config.database).await?;
+        let blooms: crate::shortcode::bloom_filter::BloomState = build_bloom_state(&url_db).await?;
+        let db_pool = db::make_pools(&cfg.database).await?;
         let repos = db::make_repos(&db_pool).await;
 
-        let auth_service = Arc::new(AuthService::new(
+        let jwt = JwtKeys::new(cfg.application.api_key.as_bytes());
+
+        let auth_svc = Arc::new(AuthService::new(
             repos.users.clone(),
             repos.auth.clone(),
-            JwtKeys::new(config.application.api_key.as_bytes()),
-            Duration::minutes(15),
-            config.application.api_key.to_string(),
+            jwt.clone(),
+            chrono::Duration::minutes(15),
+            cfg.application.api_key.to_string(),
         ));
-
-        let user_service = Arc::new(UserService::new(repos.users.clone()));
+        let user_svc = Arc::new(UserService::new(repos.users.clone()));
 
         // Set up the TCP listener and application state
-        let api_key = config.application.api_key;
-        let template_dir = config.application.templates.clone();
-        let address = format!("{}:{}", config.application.host, config.application.port);
+        let address = format!("{}:{}", cfg.application.host, cfg.application.port);
         let listener = TcpListener::bind(address)
             .await
             .context("Unable to obtain a TCP listener...")?;
         let port = listener.local_addr()?.port();
-        let state = AppState::new(
-            database,
-            code_generator,
+
+        let state = AppState {
+            db_pool: Arc::new(db_pool),
+            code_generator: code_gen,
             blooms,
             allowed_chars,
-            api_key,
-            template_dir,
-            config,
-            auth_service,
-            user_service,
-        );
+            api_key: cfg.application.api_key,
+            template_dir: cfg.application.templates.clone(),
+            config: cfg.clone(),
+            auth_service: auth_svc,
+            user_service: user_svc,
+            jwt,
+            database: url_db,
+        };
 
         // Build the application router, passing in the application state
-        let router = build_router(state.clone(), repos)
+        let router = build_router(state.clone())
             .await
             .context("Failed to create the application router.")?;
 
@@ -397,6 +385,7 @@ impl Application {
         axum::serve(
             self.listener,
             self.router
+                .with_state(self.state.clone())
                 .into_make_service_with_connect_info::<std::net::SocketAddr>(),
         )
         .with_graceful_shutdown(async move {
@@ -490,7 +479,7 @@ impl Application {
 /// # Ok(())
 /// # }
 /// ```
-pub async fn build_router(state: AppState, repos: RepoSet) -> Result<Router, anyhow::Error> {
+pub async fn build_router(state: AppState) -> Result<Router<AppState>, anyhow::Error> {
     // Define the tracing layer for request/response logging
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(|req: &Request<_>| {
@@ -584,24 +573,8 @@ pub async fn build_router(state: AppState, repos: RepoSet) -> Result<Router, any
         .route("/admin/register", get(get_register));
     // TODO: Add session-based auth middleware once implemented
 
-    let auth_ctx = Arc::new(AuthCtx {
-        users: repos.users.clone(),
-        jwt: JwtKeys::new(state.api_key.as_bytes()),
-    });
-
-    let auth_router = auth::router(
-        AuthController {
-            svc: state.auth_service.clone(),
-        },
-        auth_ctx.clone(),
-    );
-
-    let user_router = users::router(
-        users::controllers::UserController {
-            svc: state.user_service.clone(),
-        },
-        auth_ctx.clone(),
-    );
+    let auth_router = auth::router();
+    let user_router = users::router();
 
     // Merge all routes together
     let router = Router::new()
@@ -623,4 +596,15 @@ pub async fn build_router(state: AppState, repos: RepoSet) -> Result<Router, any
         );
 
     Ok(router)
+}
+
+pub fn build_allowed_chars(alphabet: Option<&str>) -> HashSet<char> {
+    let mut set = HashSet::new();
+    if let Some(alpha) = alphabet {
+        set.extend(alpha.chars());
+    } else {
+        set.extend(DEFAULT_ALPHABET.iter().copied());
+    }
+
+    set
 }

@@ -104,6 +104,9 @@ pub struct ApplicationSettings {
     pub api_key: Uuid,
     /// Directory path containing Tera template files
     pub templates: String,
+
+    pub jwt_secret_b64: String,
+    pub pwd_pepper_b64: String,
 }
 
 /// Supported database types.
