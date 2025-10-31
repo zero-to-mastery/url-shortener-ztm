@@ -1,0 +1,18 @@
+{% extends "base_admin.html" %}
+{% set title = "Analytics" %}
+
+{% block content %}
+<!-- Chart Grid - Contains the analytics charts for clicks and referrers -->
+<div class="chart-grid">
+    <!-- Clicks Chart - Shows click activity over time -->
+    <div class="chart-container">
+        <h2>Clicks Over Time</h2>
+        <canvas id="clicksChart"></canvas>
+    </div>
+    <!-- Referrers Chart - Shows top referrer sources -->
+    <div class="chart-container">
+        <h2>Top Referrers</h2>
+        <canvas id="referrersChart"></canvas>
+    </div>
+</div>
+{% endblock content %}

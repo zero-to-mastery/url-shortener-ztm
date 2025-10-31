@@ -5,7 +5,7 @@
 
 use crate::errors::ApiError;
 use crate::state::AppState;
-use crate::templates::build_templates;
+use crate::templates::get_templates;
 use axum::{extract::State, response::Html};
 use axum_macros::debug_handler;
 use tera::Context;
@@ -63,13 +63,13 @@ use tera::Context;
 /// - Template rendering fails
 /// - Context data is invalid
 #[debug_handler]
-pub async fn get_index(State(state): State<AppState>) -> Result<Html<String>, ApiError> {
+pub async fn get_index(_state: State<AppState>) -> Result<Html<String>, ApiError> {
     let mut context = Context::new();
     context.insert("title", "URL Shortener");
     context.insert("page", "Home");
     context.insert("message", "Hello, world!");
 
-    let body = build_templates(state)?.render("index.html", &context)?;
+    let body = get_templates().render("index.html", &context)?;
 
     Ok(Html(body))
 }

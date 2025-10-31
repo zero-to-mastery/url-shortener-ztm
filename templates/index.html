@@ -9,26 +9,13 @@
     <form id="urlForm" class="url-form" aria-label="URL Shortener Form">
       <label for="urlInput">Add your link</label>
       <div class="input-group">
-        <input
-          type="url"
-          id="urlInput"
-          name="url"
-          placeholder="https://enter-your-long-url-here.com/..."
-          required
-          autocomplete="url"
-          aria-describedby="url-help"
-        />
-        <button
-          type="submit"
-          id="submitBtn"
-          class="btn btn-primary"
-          aria-describedby="submit-help"
-        >
+        <input type="url" id="urlInput" name="url" placeholder="https://enter-your-long-url-here.com/..." required
+          autocomplete="url" aria-describedby="url-help" />
+        <button type="submit" id="submitBtn" class="btn btn-primary" aria-describedby="submit-help">
           <span class="btn-text">Shrink it</span>
 
           <span class="btn-loading hidden" aria-hidden="true">
             <span class="spinner"></span>
-            Shortening...
           </span>
         </button>
       </div>
@@ -48,18 +35,8 @@
     <button id="closeResult" class="close-btn" aria-label="Close">×</button>
     <div class="short-url-container">
       <label for="shortUrl" class="visually-hidden">Short URL</label>
-      <input
-        type="text"
-        id="shortUrl"
-        readonly
-        class="short-url-input"
-        aria-label="Generated short URL"
-      />
-      <button
-        id="copyBtn"
-        class="btn btn-secondary copy-btn"
-        aria-label="Copy short URL to clipboard"
-      >
+      <input type="text" id="shortUrl" readonly class="short-url-input" aria-label="Generated short URL" />
+      <button id="copyBtn" class="btn btn-secondary copy-btn" aria-label="Copy short URL to clipboard">
         <span class="copy-text">Copy</span>
         <span class="copy-success hidden" aria-hidden="true">✓ Copied!</span>
       </button>
@@ -76,79 +53,119 @@
     <button id="retryBtn" class="btn btn-secondary">Try Again</button>
   </div>
 </div>
-
-<section class="features" aria-labelledby="features-heading">
-  <div class="container">
-    <h2 id="features-heading">Features</h2>
-  </div>
-  <div class="features-carousel">
-    <div class="feature-card-wrapper">
-      <div class="feature-card-side feature-card-side--left"></div>
-      <article class="feature-card-main">
-        <header class="feature-header">
-          <h3>statistics</h3>
-
-          <div class="feature-icon" aria-hidden="true">📊</div>
-        </header>
-        <div class="feature-body">
-          <p>
-            Lorem ipsum dolor sit amet consectetur. Amet ornare pharetra ut ac
-            vitae in facilisis aliquet tellus. Aliquet diam pellentesque
-            dignissim risus magna massa pharetra turpis.
-          </p>
-        </div>
-      </article>
-      <div class="feature-card-side feature-card-side--right"></div>
-    </div>
+<div class="main-content-wrapper">
+  <section class="features" aria-labelledby="features-heading">
     <div class="container">
-      <div class="carousel-dots" role="tablist" aria-label="Features carousel">
-        <button
-          role="tab"
-          class="dot active"
-          aria-selected="true"
-          aria-label="Show feature 1"
-        ></button>
-        <button
-          role="tab"
-          class="dot"
-          aria-selected="false"
-          aria-label="Show feature 2"
-        ></button>
-        <button
-          role="tab"
-          class="dot"
-          aria-selected="false"
-          aria-label="Show feature 3"
-        ></button>
-        <button
-          role="tab"
-          class="dot"
-          aria-selected="false"
-          aria-label="Show feature 4"
-        ></button>
-        <button
-          role="tab"
-          class="dot"
-          aria-selected="false"
-          aria-label="Show feature 5"
-        ></button>
-      </div>
+      <h2 id="features-heading">Features</h2>
     </div>
-  </div>
-</section>
+    <div class="features-carousel">
+      <div class="feature-card-wrapper">
+        <div class="feature-card-side feature-card-side--left"></div>
+        <!-- Feature 1: Lightning Fast -->
+        <article class="feature-card-main" data-feature="0">
+          <header class="feature-header">
+            <h3>Lightning Fast</h3>
+            <div class="feature-icon" aria-hidden="true">⚡</div>
+          </header>
+          <div class="feature-body">
+            <p>
+              Built with Rust for blazing-fast performance. Our optimized backend
+              processes millions of redirects per second with sub-millisecond latency,
+              ensuring your users never wait.
+            </p>
+          </div>
+        </article>
 
-<section class="admin-section hidden" aria-labelledby="admin-heading">
-  <div class="container">
-    <div class="admin-info">
-      <h2 id="admin-heading">Admin Access</h2>
-      <p>Manage your shortened URLs and access advanced features</p>
-      <div class="admin-links">
-        <a href="/admin/login" class="btn btn-secondary">Login</a>
-        <a href="/admin/register" class="btn btn-outline">Register</a>
-        <a href="/admin" class="btn btn-primary">Admin Dashboard</a>
+        <!-- Feature 2: Advanced Analytics -->
+        <article class="feature-card-main hidden" data-feature="1">
+          <header class="feature-header">
+            <h3>Advanced Analytics</h3>
+            <div class="feature-icon" aria-hidden="true">📊</div>
+          </header>
+          <div class="feature-body">
+            <p>
+              Track clicks, geographic locations, devices, browsers, and referrers
+              in real-time. Gain deep insights into your audience with beautiful,
+              interactive dashboards and exportable reports.
+            </p>
+          </div>
+        </article>
+
+        <!-- Feature 3: Custom Domains -->
+        <article class="feature-card-main hidden" data-feature="2">
+          <header class="feature-header">
+            <h3>Custom Domains</h3>
+            <div class="feature-icon" aria-hidden="true">🌐</div>
+          </header>
+          <div class="feature-body">
+            <p>
+              Use your own branded domain for short links. Build trust with your
+              audience using memorable, professional URLs that reinforce your brand
+              identity on every share.
+            </p>
+          </div>
+        </article>
+
+        <!-- Feature 4: Secure & Private -->
+        <article class="feature-card-main hidden" data-feature="3">
+          <header class="feature-header">
+            <h3>Secure & Private</h3>
+            <div class="feature-icon" aria-hidden="true">🔒</div>
+          </header>
+          <div class="feature-body">
+            <p>
+              Enterprise-grade security with end-to-end encryption, DDoS protection,
+              and malware scanning. Your data is protected with bank-level security
+              measures and regular audits.
+            </p>
+          </div>
+        </article>
+
+        <!-- Feature 5: API Access -->
+        <article class="feature-card-main hidden" data-feature="4">
+          <header class="feature-header">
+            <h3>API Access</h3>
+            <div class="feature-icon" aria-hidden="true">🔧</div>
+          </header>
+          <div class="feature-body">
+            <p>
+              Powerful RESTful API for seamless integration with your applications.
+              Automate link creation, retrieve analytics, and manage URLs
+              programmatically with comprehensive documentation.
+            </p>
+          </div>
+        </article>
+        <div class="feature-card-side feature-card-side--right"></div>
+      </div>
+      <div class="container">
+        <div class="carousel-dots" role="tablist" aria-label="Features carousel">
+          <button role="tab" class="dot active" aria-selected="true" aria-label="Show Lightning Fast feature"
+            data-index="0"></button>
+          <button role="tab" class="dot" aria-selected="false" aria-label="Show Advanced Analytics feature"
+            data-index="1"></button>
+          <button role="tab" class="dot" aria-selected="false" aria-label="Show Custom Domains feature"
+            data-index="2"></button>
+          <button role="tab" class="dot" aria-selected="false" aria-label="Show Secure & Private feature"
+            data-index="3"></button>
+          <button role="tab" class="dot" aria-selected="false" aria-label="Show API Access feature"
+            data-index="4"></button>
+        </div>
+      </div>
+  </section>
+
+  <section class="admin-section" aria-labelledby="admin-heading">
+    <div class="container">
+      <div class="admin-info">
+        <h2 id="admin-heading">Admin Access</h2>
+        <p>Manage your shortened URLs and access advanced features</p>
+        <div class="admin-links">
+          <a href="/admin/login" class="btn btn-secondary">Login</a>
+          <a href="/admin/register" class="btn btn-outline">Register</a>
+          <a href="/admin" class="btn btn-primary">Admin Dashboard</a>
+        </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
+</div>
 
 {% endblock content %}

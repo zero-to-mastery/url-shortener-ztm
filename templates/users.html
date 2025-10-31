@@ -1,0 +1,97 @@
+{% extends "base_admin.html" %}
+{% set title = "Manage Users" %}
+
+{% block page_header %}
+<header class="page-header">
+    <h1>{{ title }}</h1>
+    <button class="hamburger-button" id="hamburger-button" aria-label="Toggle menu">
+        ☰
+    </button>
+    <button class="btn btn-primary">Add New User</button>
+</header>
+{% endblock page_header %}
+
+{% block content %}
+<!-- Card - Main container for user management content -->
+<div class="card">
+    <!-- Toolbar - Contains user management controls like search -->
+    <div class="toolbar">
+        <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="user-search" placeholder="Search by username or email...">
+        </div>
+    </div>
+
+    <!-- Data Table Container - Displays the list of users -->
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Links Created</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="user-table-body">
+                <!-- Hardcoded data restored -->
+                <tr>
+                    <td data-label="Username">Admin</td>
+                    <td data-label="Email">admin@example.com</td>
+                    <td data-label="Links Created">1,234</td>
+                    <td data-label="Status"><span class="status-badge active">Active</span></td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="btn btn-sm">Edit</button>
+                            <button class="btn btn-sm btn-danger">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td data-label="Username">JaneDoe</td>
+                    <td data-label="Email">jane.doe@example.com</td>
+                    <td data-label="Links Created">567</td>
+                    <td data-label="Status">
+                        <span class="status-badge active">Active</span>
+                    </td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="btn btn-sm">Edit</button>
+                            <button class="btn btn-sm btn-danger">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td data-label="Username">JohnSmith</td>
+                    <td data-label="Email">john.smith@example.com</td>
+                    <td data-label="Links Created">892</td>
+                    <td data-label="Status">
+                        <span class="status-badge active">Active</span>
+                    </td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="btn btn-sm">Edit</button>
+                            <button class="btn btn-sm btn-danger">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td data-label="Username">SarahWilson</td>
+                    <td data-label="Email">sarah.wilson@example.com</td>
+                    <td data-label="Links Created">234</td>
+                    <td data-label="Status">
+                        <span class="status-badge suspended">Suspended</span>
+                    </td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="btn btn-sm">Edit</button>
+                            <button class="btn btn-sm btn-danger">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock content %}

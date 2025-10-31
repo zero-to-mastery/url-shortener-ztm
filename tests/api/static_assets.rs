@@ -34,7 +34,7 @@ async fn assets_are_served() {
         "Index page missing expected <title>"
     );
     assert!(
-        index_body.contains("/static/screen.css"),
+        index_body.contains("/static/landing.css"),
         "Index page missing CSS link"
     );
     assert!(
@@ -43,7 +43,7 @@ async fn assets_are_served() {
     );
 
     // Check CSS asset
-    assert_asset_ok(&app, "/static/screen.css", "css", "static/screen.css").await;
+    assert_asset_ok(&app, "/static/landing.css", "css", "static/landing.css").await;
 
     // Check JS asset
     assert_asset_ok(

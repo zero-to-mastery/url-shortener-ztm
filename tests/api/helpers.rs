@@ -89,6 +89,9 @@ pub async fn spawn_app() -> TestApp {
         configuration.application.templates.clone(),
         configuration.clone(),
     );
+    // Build the templates for the test app
+    url_shortener_ztm_lib::templates::build_templates(test_app_state.clone())
+        .expect("Failed to build templates for test app");
 
     // Launch the application as a background task
     let test_app = build_router(test_app_state.clone())
