@@ -182,7 +182,7 @@ pub async fn post_shorten(
         ApiError::Unprocessable(e.to_string())
     })?;
 
-    let hostname = header.hostname();
+    // let hostname = header.hostname();
 
     let (upset, code) = insert_with_retry(&state, &norm).await?;
     if upset.created {
@@ -210,7 +210,11 @@ pub async fn post_shorten(
     };
 
     tracing::info!("URL shortened and saved successfully");
-    Ok(make_response(hostname, &final_code, &norm))
+    Ok(make_response(
+        &state.config.application.base_url,
+        &final_code,
+        &norm,
+    ))
 }
 
 /// Parses and normalizes a URL:
@@ -294,8 +298,11 @@ async fn insert_with_retry(
 }
 
 /// Builds a unified response structure for shortened URLs.
-fn make_response(hostname: &str, id: &str, original_url: &str) -> ApiResponse<ShortenResponse> {
-    let shortened_url = format!("https://{}/{}", hostname, id);
+fn make_response(base_url: &str, id: &str, original_url: &str) -> ApiResponse<ShortenResponse> {
+    // Trim any trailing slash from the base_url to prevent double slashes (e.g., "http://localhost:8000//ID")
+    let base = base_url.trim_end_matches('/');
+    let shortened_url = format!("{}/{}", base, id);
+
     let response_data = ShortenResponse {
         shortened_url,
         original_url: original_url.to_string(),
