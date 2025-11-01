@@ -1,5 +1,5 @@
 # Use the official Rust image as the base image for building
-FROM rust:1.90-slim AS builder
+FROM rust:1.91-slim AS builder
 
 # Install required packages for building
 RUN apt-get update && apt-get install -y \
