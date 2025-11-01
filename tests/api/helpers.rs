@@ -38,6 +38,7 @@ pub struct TestApp {
     pub client: reqwest::Client,
     pub _database: Arc<dyn UrlDatabase>,
     pub api_key: Uuid,
+    pub base_url: String,
 }
 
 // Spin up an instance of our application and returns its address (i.e. http://localhost:XXXX)
@@ -126,12 +127,15 @@ pub async fn spawn_app() -> TestApp {
         .build()
         .expect("Failed to build reqwest client.");
 
+    let base_url = configuration.application.base_url.clone();
+
     TestApp {
         address: format!("http://127.0.0.1:{}", test_app_port),
         _port: test_app_port,
         client,
         _database: database,
         api_key,
+        base_url,
     }
 }
 
@@ -204,22 +208,19 @@ impl TestApp {
         let body_str = body.into();
         // Validate the URL using normalize_url function
         match normalize_url(&body_str) {
-            Ok(_) => {
-                self.client
-                    .post(self.api(path))
-                    .header("x-api-key", self.api_key.to_string())
-                    .header("host", "localhost:8000") // ← Add this line
-                    .body(body_str)
-                    .send()
-                    .await
-                    .expect("Failed to execute POST request")
-            }
+            Ok(_) => self
+                .client
+                .post(self.api(path))
+                .header("x-api-key", self.api_key.to_string())
+                .body(body_str)
+                .send()
+                .await
+                .expect("Failed to execute POST request"),
             Err(_) => {
                 // If URL is invalid, return a 422 response
                 self.client
                     .post(self.api(path))
                     .header("x-api-key", self.api_key.to_string())
-                    .header("host", "localhost:8000") // ← Add this line
                     .body(body_str)
                     .send()
                     .await

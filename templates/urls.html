@@ -1,0 +1,67 @@
+{% extends "base_admin.html" %}
+{% set title = "Manage URLs" %}
+
+{% block page_header %}
+<header class="page-header">
+    <h1>{{ title }}</h1>
+    <button class="hamburger-button" id="hamburger-button" aria-label="Toggle menu">
+        ☰
+    </button>
+    <a href="/" class="btn btn-primary">Create New URL</a>
+</header>
+{% endblock page_header %}
+
+{% block content %}
+<!-- Toolbar - Contains URL management controls like search -->
+<div class="toolbar">
+    <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="url-search" placeholder="Search by short code or URL...">
+    </div>
+</div>
+
+<!-- Data Table Container - Displays the list of shortened URLs -->
+<div class="data-table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Short Code</th>
+                <th>Original URL</th>
+                <th>Clicks</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="url-table-body">
+            <!-- Hardcoded data restored -->
+            <tr>
+                <td><a href="/AbC123" class="short-code">AbC123</a></td>
+                <td class="url-cell"><a href="https://github.com/zero-to-mastery/url-shortener-ztm" target="_blank"
+                        rel="noopener">https://github.com/zero-to-mastery/url-shortener-ztm</a></td>
+                <td>1,204</td>
+                <td>Oct 23, 2025</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm">Copy</button>
+                        <button class="btn btn-sm btn-danger">Delete</button>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td><a href="/DeF456" class="short-code">DeF456</a></td>
+                <td class="url-cell"><a href="https://www.udemy.com/course/complete-rust-developer-zero-to-mastery/"
+                        target="_blank"
+                        rel="noopener">https://www.udemy.com/course/complete-rust-developer-zero-to-mastery/</a></td>
+                <td>876</td>
+                <td>Oct 21, 2025</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm">Copy</button>
+                        <button class="btn btn-sm btn-danger">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock content %}

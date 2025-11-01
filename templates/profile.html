@@ -1,122 +1,43 @@
-{% extends "base.html" %}
+{% extends "base_admin.html" %}
+{% set title = "User Profile" %}
 
 {% block content %}
-<div class="container">
-  <div class="hero">
-    <h2>User Profile</h2>
-    <p>{{ message }}</p>
-  </div>
-
-  <div class="profile-section">
-    <div class="profile-info">
-      <h3>Profile Information</h3>
-      <form class="profile-form">
-        <div class="form-group">
-          <label for="username">Username:</label>
-          <input type="text" id="username" name="username" value="admin" readonly>
-        </div>
-        <div class="form-group">
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" value="admin@example.com">
-        </div>
-        <div class="form-group">
-          <label for="created">Member Since:</label>
-          <input type="text" id="created" name="created" value="2025-01-01" readonly>
-        </div>
-        <button type="submit" class="btn primary">Update Profile</button>
-      </form>
+<!-- Profile Grid - Contains the profile information and password change sections -->
+<div class="profile-grid">
+    <!-- Profile Information Card - Allows editing of user's profile details -->
+    <div class="profile-card">
+        <h2>Profile Information</h2>
+        <form class="profile-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" value="admin" readonly>
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" value="admin@example.com">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Update Profile</button>
+        </form>
     </div>
 
-    <div class="urls-section">
-      <h3>Your Shortened URLs</h3>
-
-      <div class="urls-table-container">
-        <table class="urls-table">
-          <thead>
-            <tr>
-              <th>Short Code</th>
-              <th>Original URL</th>
-              <th>Created</th>
-              <th>Clicks</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td data-label="Short Code">AbC123</td>
-              <td data-label="Original URL">
-                <span class="truncate-url">
-                  https://github.com/your-username/url-shortener-project-with-rust-and-axum-and-other-long-words
-                </span>
-              </td>
-              <td data-label="Created">Oct 23, 2025</td>
-              <td data-label="Clicks">0</td>
-              <td data-label="Actions">
-                <div class="url-actions">
-                  <button class="btn small">Copy</button>
-                  <button class="btn small danger">Delete</button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td data-label="Short Code">DeF456</td>
-              <td data-label="Original URL">
-                <span class="truncate-url">
-                  https://www.verylongdomainnameexample.com/a/b/c/d/page.html
-                </span>
-              </td>
-              <td data-label="Created">Oct 21, 2025</td>
-              <td data-label="Clicks">0</td>
-              <td data-label="Actions">
-                <div class="url-actions">
-                  <button class="btn small">Copy</button>
-                  <button class="btn small danger">Delete</button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td data-label="Short Code">MKKEzZY</td>
-              <td data-label="Original URL">
-                <span class="truncate-url">
-                  https://cataas.com/cat
-                </span>
-              </td>
-              <td data-label="Created">Oct 22, 2025</td>
-              <td data-label="Clicks">0</td>
-              <td data-label="Actions">
-                <div class="url-actions">
-                  <button class="btn small">Copy</button>
-                  <button class="btn small danger">Delete</button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td data-label="Short Code">GhI789</td>
-              <td data-label="Original URL">
-                <span class="truncate-url">
-                  https://developer.mozilla.org/en-US/docs/Web/CSS/text-overflow
-                </span>
-              </td>
-              <td data-label="Created">Sep 30, 2025</td>
-              <td data-label="Clicks">0</td>
-              <td data-label="Actions">
-                <div class="url-actions">
-                  <button class="btn small">Copy</button>
-                  <button class="btn small danger">Delete</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p class="empty-state" style="display: none;">You haven't created any shortened URLs yet.</p>
+    <!-- Change Password Card - Allows user to change their password -->
+    <div class="password-card">
+        <h2>Change Password</h2>
+        <form class="password-form">
+            <div class="form-group">
+                <label for="current-password">Current Password</label>
+                <input type="password" id="current-password" required>
+            </div>
+            <div class="form-group">
+                <label for="new-password">New Password</label>
+                <input type="password" id="new-password" required>
+            </div>
+            <div class="form-group">
+                <label for="confirm-password">Confirm New Password</label>
+                <input type="password" id="confirm-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Change Password</button>
+        </form>
     </div>
-  </div>
-
-  <div class="profile-actions">
-    <a href="/admin" class="btn secondary">Back to Dashboard</a>
-    <a href="/" class="btn secondary">Home</a>
-  </div>
 </div>
 {% endblock content %}

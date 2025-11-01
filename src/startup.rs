@@ -61,8 +61,8 @@ use crate::generator::{DEFAULT_ALPHABET, build_generator};
 use crate::infrastructure::db::{self};
 use crate::middleware::check_api_key;
 use crate::routes::{
-    get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
-    health_check, post_shorten, serve_openapi_spec, serve_swagger_ui,
+    get_admin_dashboard, get_analytics, get_index, get_login, get_redirect, get_register, get_urls,
+    get_user_profile, get_users, health_check, post_shorten, serve_openapi_spec, serve_swagger_ui,
 };
 use axum::middleware::from_fn;
 use tokio::time::Duration as TokioDuration;
@@ -275,6 +275,9 @@ impl Application {
             database: url_db,
         };
 
+        // Template initialization
+        crate::templates::build_templates(state.clone()).expect("Failed to build templates");
+
         // Build the application router, passing in the application state
         let router = build_router(state.clone())
             .await
@@ -474,6 +477,7 @@ impl Application {
 /// ```
 pub async fn build_router(state: AppState) -> Result<Router<AppState>, anyhow::Error> {
     // Define the tracing layer for request/response logging
+    crate::templates::build_templates(state.clone()).context("Failed to build templates")?;
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(|req: &Request<_>| {
             let ua = req
@@ -563,7 +567,11 @@ pub async fn build_router(state: AppState) -> Result<Router<AppState>, anyhow::E
         .route("/admin", get(get_admin_dashboard))
         .route("/admin/profile", get(get_user_profile))
         .route("/admin/login", get(get_login))
-        .route("/admin/register", get(get_register));
+        .route("/admin/register", get(get_register))
+        .route("/admin/users", get(get_users))
+        .route("/admin/urls", get(get_urls))
+        .route("/admin/analytics", get(get_analytics));
+    // TODO: Add session-based auth middleware once implemented
 
     // Merge all routes together
     let mut router = Router::new()

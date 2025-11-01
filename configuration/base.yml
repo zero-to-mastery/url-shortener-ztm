@@ -1,6 +1,7 @@
 application:
   port: 8000
   host: 0.0.0.0
+  base_url: "http://localhost:8000"
   # WARNING: This is a development-only API key. It is intentionally predictable
   # and must NEVER be used in production. The application will emit a runtime
   # warning if this default key is detected.

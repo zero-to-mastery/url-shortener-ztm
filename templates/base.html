@@ -1,36 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Shorten your URLs quickly and securely. Create short, shareable links in seconds with our powerful URL shortener.">
-  <meta name="keywords" content="URL shortener, link shortener, short links, URL compression, link management">
-  <meta name="author" content="Jeffery D Mitchell">
-  <link rel="stylesheet" type="text/css" href="/static/screen.css" media="screen" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="Shorten your URLs quickly and securely. Create short, shareable links in seconds with our powerful URL shortener." />
+  <meta name="keywords" content="URL shortener, link shortener, short links, URL compression, link management" />
+  <meta name="author" content="Jeffery D Mitchell" />
+  <link rel="stylesheet" type="text/css" href="/static/landing.css" media="screen" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="icon" type="image/x-icon" href="/static/logo-dark.png" />
   <title>{{ title }} | {{ page }}</title>
 </head>
+
 <body>
-  <header>
-    <nav class="nav" role="navigation" aria-label="Main navigation">
-      <div class="nav-brand">
-        <h1> URL Shortener</h1>
-      </div>
-      <div class="nav-links">
-        <a href="/">Home</a>
-        <a href="/admin">Admin</a>
-      </div>
-    </nav>
+  <header class="site-header" role="banner">
+    <div class="container">
+      <nav class="main-nav" role="navigation" aria-label="Main navigation">
+        <a href="/" class="nav-brand" aria-label="Linkly Homepage">
+          <img src="../static/logo-dark.png" alt="" class="logo-icon" aria-hidden="true" />
+          <span class="brand-name">Linkly</span>
+        </a>
+      </nav>
+      <a href="/admin" id="adminNavLink" class="btn btn-primary admin-btn">Admin</a>
+    </div>
   </header>
-  
-  <main>
-    {% block content %}{% endblock content %}
-  </main>
-  
-  <footer role="contentinfo">
-    <p>&copy; <span id="year"></span><noscript>2025</noscript> Jeffery D Mitchell | All Rights Reserved</p>
+
+  <main role="main">{% block content %}{% endblock content %}</main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-brand">
+        <img src="../static/logo-light.png" alt="Linkly logo" class="logo-icon" />
+        <span class="brand-name brand-name-light">Linkly</span>
+      </div>
+      <div class="footer-grid">
+        <div class="footer-column">
+          <h3>About</h3>
+          <p>
+            Linkly is a high-performance URL shortener built with Rust, designed for speed, security, and reliability.
+            Our mission is to provide a fast and elegant way to shorten, share, and track your links.
+          </p>
+        </div>
+        <div class="footer-column">
+          <h3>Contact</h3>
+          <ul class="social-links">
+            <li>
+              <a href="https://x.com" target="_blank" aria-label="Linkly on X" class="social-icon"><img src="../static/x.svg" alt="X logo" /></a>
+            </li>
+            <li>
+              <a href="https://www.instagram.com" target="_blank" aria-label="Linkly on Instagram" class="social-icon"><img src="../static/instagram.svg"
+                  alt="Instagram logo" /></a>
+            </li>
+            <li>
+              <a href="https://www.facebook.com" target="_blank" aria-label="Linkly on Facebook" class="social-icon"><img src="../static/facebook.svg"
+                  alt="Facebook logo" /></a>
+            </li>
+          </ul>
+        </div>
+        <div class="footer-column">
+          <h3>Privacy Policy</h3>
+          <p>
+            Your privacy is important to us. We collect minimal data necessary for service operation and do not sell
+            your information. Our service is designed to be privacy-conscious by default.
+          </p>
+        </div>
+        <div class="footer-column">
+          <h3>Terms of Service</h3>
+          <p>
+            By using Linkly, you agree not to use the service for illegal activities, spam, or phishing. We reserve the
+            right to disable links that violate our terms to protect all users and maintain service integrity.
+          </p>
+        </div>
+      </div>
+      <div class="footer-copyright">
+        <p>
+          &copy; <span id="year"></span><noscript>2025</noscript> Linkly | All
+          Rights Reserved
+        </p>
+      </div>
+    </div>
   </footer>
   <script type="module" src="/static/scripts.js"></script>
 </body>
+
 </html>
