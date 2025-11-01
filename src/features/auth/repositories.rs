@@ -73,3 +73,59 @@ pub trait AuthRepository: Send + Sync {
     async fn revoke_device(&self, id: i32) -> anyhow::Result<()>;
     async fn revoke_all(&self, user_id: Uuid) -> anyhow::Result<()>;
 }
+
+// A no-operation implementation of AuthRepository for testing purposes.
+#[derive(Clone, Debug)]
+pub struct NoopAuthRepo;
+
+#[async_trait]
+impl AuthRepository for NoopAuthRepo {
+    async fn upsert_refresh_device(
+        &self,
+        _user_id: Uuid,
+        _device_id: &str,
+        _current_hash: &[u8],
+        _absolute_expires: DateTime<Utc>,
+        _user_agent: Option<&str>,
+        _ip: Option<IpAddr>,
+    ) -> anyhow::Result<i32> {
+        anyhow::bail!("NoopAuthRepo: sqlite tests don't support refresh devices")
+    }
+
+    async fn get_refresh_device_by_rt(
+        &self,
+        _device_id: &str,
+        _rt_hash: &[u8],
+    ) -> anyhow::Result<Option<RefreshDevice>> {
+        Ok(None)
+    }
+
+    async fn get_refresh_device_by_user_id(
+        &self,
+        _device_id: &str,
+        _user_id: Uuid,
+    ) -> anyhow::Result<Option<RefreshDevice>> {
+        Ok(None)
+    }
+
+    async fn rotate_refresh_hash(
+        &self,
+        _id: i32,
+        _new_hash: &[u8],
+        _rotated_at: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    async fn set_previous_hash(&self, _id: i32, _prev: Option<&[u8]>) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    async fn revoke_device(&self, _id: i32) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    async fn revoke_all(&self, _user_id: Uuid) -> anyhow::Result<()> {
+        Ok(())
+    }
+}

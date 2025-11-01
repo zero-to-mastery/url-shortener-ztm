@@ -6,12 +6,14 @@ use reqwest::header::CONTENT_TYPE;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
+use url_shortener_ztm_lib::core::security::jwt::JwtKeys;
 use url_shortener_ztm_lib::database::{SqliteUrlDatabase, UrlDatabase};
 use url_shortener_ztm_lib::generator::{self, build_generator};
 use url_shortener_ztm_lib::get_configuration;
 use url_shortener_ztm_lib::routes::shorten::normalize_url;
 use url_shortener_ztm_lib::shortcode::bloom_filter::build_bloom_state;
 use url_shortener_ztm_lib::startup::build_router;
+use url_shortener_ztm_lib::startup::build_services;
 use url_shortener_ztm_lib::state::AppState;
 use url_shortener_ztm_lib::telemetry::{get_subscriber, init_subscriber};
 use uuid::Uuid;
@@ -77,32 +79,42 @@ pub async fn spawn_app() -> TestApp {
 
     // Store the API key for use in tests
     let api_key = configuration.application.api_key;
-
     let blooms = build_bloom_state(&database).await.unwrap();
+    let jwt = JwtKeys::new(configuration.application.api_key.as_bytes());
 
-    let test_app_state = AppState::new(
-        database.clone(),
+    let (auth_svc, user_svc) = build_services(&configuration, &jwt).await.unwrap();
+
+    let test_app_state = AppState {
+        // db_pool: Arc::new(db_pool),
         code_generator,
         blooms,
         allowed_chars,
-        api_key,
-        configuration.application.templates.clone(),
-        configuration.clone(),
-    );
+        api_key: configuration.application.api_key,
+        template_dir: configuration.application.templates.clone(),
+        config: configuration.clone(),
+        auth_service: auth_svc,
+        user_service: user_svc,
+        jwt,
+        database: database.clone(),
+    };
 
     // Launch the application as a background task
     let test_app = build_router(test_app_state.clone())
         .await
         .expect("Failed to build application.");
+
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("Failed to bind random port");
+
     let test_app_port = listener.local_addr().unwrap().port();
 
     tokio::spawn(async move {
         axum::serve(
             listener,
-            test_app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            test_app
+                .with_state(test_app_state.clone())
+                .into_make_service_with_connect_info::<std::net::SocketAddr>(),
         )
         .await
         .expect("Failed to serve application")

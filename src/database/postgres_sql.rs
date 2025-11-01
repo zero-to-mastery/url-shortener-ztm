@@ -296,7 +296,7 @@ impl UrlDatabase for PostgresUrlDatabase {
     }
 
     async fn save_bloom_snapshot(&self, name: &str, data: &[u8]) -> Result<(), DatabaseError> {
-        sqlx::query!(
+        sqlx::query(
             r#"
                 INSERT INTO bloom_snapshots (name, data)
                 VALUES ($1, $2)
@@ -305,9 +305,9 @@ impl UrlDatabase for PostgresUrlDatabase {
                 SET data = EXCLUDED.data,
                     updated_at = NOW()
             "#,
-            name,
-            data
         )
+        .bind(name)
+        .bind(data)
         .execute(&self.pool)
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;

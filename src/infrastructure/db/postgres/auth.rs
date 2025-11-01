@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sqlx::{PgPool, types::ipnetwork::IpNetwork};
+use sqlx::{PgPool, Row, types::ipnetwork::IpNetwork};
 use uuid::Uuid;
 
 use crate::features::auth::repositories::{AuthRepository, RefreshDevice};
@@ -23,7 +23,7 @@ impl AuthRepository for PgAuthRepository {
         user_agent: Option<&str>,
         ip: Option<IpAddr>,
     ) -> anyhow::Result<i32> {
-        let rec = sqlx::query!(
+        let row = sqlx::query(
             r#"
             INSERT INTO refresh_token_devices (user_id, device_id, current_hash, absolute_expires, user_agent, ip)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -38,16 +38,17 @@ impl AuthRepository for PgAuthRepository {
                 revoked_at = NULL
             RETURNING id
             "#,
-            user_id,
-            device_id,
-            current_hash,
-            absolute_expires,
-            user_agent,
-            ip.map(IpNetwork::from)
         )
+        .bind(user_id)
+        .bind(device_id)
+        .bind(current_hash)
+        .bind(absolute_expires)
+        .bind(user_agent)
+        .bind(ip.map(IpNetwork::from))
         .fetch_one(&self.pool)
         .await?;
-        Ok(rec.id)
+        let id = row.get::<i32, _>("id");
+        Ok(id)
     }
 
     async fn get_refresh_device_by_rt(
@@ -55,30 +56,30 @@ impl AuthRepository for PgAuthRepository {
         device_id: &str,
         provided_hash: &[u8],
     ) -> anyhow::Result<Option<RefreshDevice>> {
-        let r = sqlx::query!(
+        let row = sqlx::query(
             r#"
             SELECT id, user_id, device_id, current_hash, previous_hash, absolute_expires,
                     revoked_at, user_agent, ip, last_rotated_at
             FROM refresh_token_devices
             WHERE device_id = $1 AND current_hash = $2
             "#,
-            device_id,
-            provided_hash
         )
+        .bind(device_id)
+        .bind(provided_hash)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(r.map(|x| RefreshDevice {
-            id: x.id,
-            user_id: x.user_id,
-            device_id: x.device_id,
-            current_hash: x.current_hash,
-            previous_hash: x.previous_hash,
-            absolute_expires: x.absolute_expires,
-            revoked_at: x.revoked_at,
-            user_agent: x.user_agent,
-            ip: x.ip.map(|ipn| ipn.ip()),
-            last_rotated_at: x.last_rotated_at,
+        Ok(row.map(|r| RefreshDevice {
+            id: r.get("id"),
+            user_id: r.get("user_id"),
+            device_id: r.get("device_id"),
+            current_hash: r.get("current_hash"),
+            previous_hash: r.get("previous_hash"),
+            absolute_expires: r.get("absolute_expires"),
+            revoked_at: r.get("revoked_at"),
+            user_agent: r.get("user_agent"),
+            ip: r.get::<Option<IpNetwork>, _>("ip").map(|ipn| ipn.ip()),
+            last_rotated_at: r.get("last_rotated_at"),
         }))
     }
 
@@ -87,30 +88,30 @@ impl AuthRepository for PgAuthRepository {
         device_id: &str,
         user_id: Uuid,
     ) -> anyhow::Result<Option<RefreshDevice>> {
-        let r = sqlx::query!(
+        let row = sqlx::query(
             r#"
             SELECT id, user_id, device_id, current_hash, previous_hash, absolute_expires,
                     revoked_at, user_agent, ip, last_rotated_at
             FROM refresh_token_devices
             WHERE device_id = $1 AND user_id = $2
             "#,
-            device_id,
-            user_id
         )
+        .bind(device_id)
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(r.map(|x| RefreshDevice {
-            id: x.id,
-            user_id: x.user_id,
-            device_id: x.device_id,
-            current_hash: x.current_hash,
-            previous_hash: x.previous_hash,
-            absolute_expires: x.absolute_expires,
-            revoked_at: x.revoked_at,
-            user_agent: x.user_agent,
-            ip: x.ip.map(|ipn| ipn.ip()),
-            last_rotated_at: x.last_rotated_at,
+        Ok(row.map(|r| RefreshDevice {
+            id: r.get("id"),
+            user_id: r.get("user_id"),
+            device_id: r.get("device_id"),
+            current_hash: r.get("current_hash"),
+            previous_hash: r.get("previous_hash"),
+            absolute_expires: r.get("absolute_expires"),
+            revoked_at: r.get("revoked_at"),
+            user_agent: r.get("user_agent"),
+            ip: r.get::<Option<IpNetwork>, _>("ip").map(|ipn| ipn.ip()),
+            last_rotated_at: r.get("last_rotated_at"),
         }))
     }
 
@@ -120,7 +121,7 @@ impl AuthRepository for PgAuthRepository {
         new_hash: &[u8],
         rotated_at: DateTime<Utc>,
     ) -> anyhow::Result<()> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE refresh_token_devices
             SET previous_hash = current_hash,
@@ -128,43 +129,37 @@ impl AuthRepository for PgAuthRepository {
                 last_rotated_at = $2
             WHERE id = $3
             "#,
-            new_hash,
-            rotated_at,
-            id
         )
+        .bind(new_hash)
+        .bind(rotated_at)
+        .bind(id)
         .execute(&self.pool)
         .await?;
         Ok(())
     }
 
     async fn set_previous_hash(&self, id: i32, prev: Option<&[u8]>) -> anyhow::Result<()> {
-        sqlx::query!(
-            "UPDATE refresh_token_devices SET previous_hash = $1 WHERE id = $2",
-            prev,
-            id
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE refresh_token_devices SET previous_hash = $1 WHERE id = $2")
+            .bind(prev)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
     async fn revoke_device(&self, id: i32) -> anyhow::Result<()> {
-        sqlx::query!(
-            "UPDATE refresh_token_devices SET revoked_at = NOW() WHERE id = $1",
-            id
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE refresh_token_devices SET revoked_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
     async fn revoke_all(&self, user_id: Uuid) -> anyhow::Result<()> {
-        sqlx::query!(
-            "UPDATE refresh_token_devices SET revoked_at = NOW() WHERE user_id = $1",
-            user_id
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE refresh_token_devices SET revoked_at = NOW() WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 }

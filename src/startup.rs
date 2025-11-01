@@ -51,9 +51,11 @@ use crate::configuration::Settings;
 use crate::core::security::jwt::JwtKeys;
 use crate::database::postgres_sql::PostgresUrlDatabase;
 use crate::database::{SqliteUrlDatabase, UrlDatabase};
+use crate::features::auth::repositories::NoopAuthRepo;
 use crate::features::auth::routes as auth;
 use crate::features::auth::services::AuthService;
 use crate::features::users;
+use crate::features::users::repositories::NoopUserRepo;
 use crate::features::users::services::UserService;
 use crate::generator::{DEFAULT_ALPHABET, build_generator};
 use crate::infrastructure::db::{self};
@@ -248,19 +250,9 @@ impl Application {
         let allowed_chars = build_allowed_chars(cfg.shortener.alphabet.as_deref());
 
         let blooms: crate::shortcode::bloom_filter::BloomState = build_bloom_state(&url_db).await?;
-        let db_pool = db::make_pools(&cfg.database).await?;
-        let repos = db::make_repos(&db_pool).await;
-
         let jwt = JwtKeys::new(cfg.application.api_key.as_bytes());
 
-        let auth_svc = Arc::new(AuthService::new(
-            repos.users.clone(),
-            repos.auth.clone(),
-            jwt.clone(),
-            chrono::Duration::minutes(15),
-            cfg.application.api_key.to_string(),
-        ));
-        let user_svc = Arc::new(UserService::new(repos.users.clone()));
+        let (auth_svc, user_svc) = build_services(&cfg, &jwt).await?;
 
         // Set up the TCP listener and application state
         let address = format!("{}:{}", cfg.application.host, cfg.application.port);
@@ -270,7 +262,7 @@ impl Application {
         let port = listener.local_addr()?.port();
 
         let state = AppState {
-            db_pool: Arc::new(db_pool),
+            // db_pool: Arc::new(db_pool),
             code_generator: code_gen,
             blooms,
             allowed_chars,
@@ -573,18 +565,12 @@ pub async fn build_router(state: AppState) -> Result<Router<AppState>, anyhow::E
         .route("/admin/login", get(get_login))
         .route("/admin/register", get(get_register));
 
-    let auth_router = auth::router();
-    let user_router = users::router();
-
     // Merge all routes together
-    let router = Router::new()
+    let mut router = Router::new()
         .merge(public_routes)
         .merge(public_shorten)
         .merge(protected_api)
         .merge(protected_admin)
-        .nest("/api/v1/auth", auth_router)
-        .nest("/api/v1/user", user_router)
-        .layer(from_fn(capture_client_meta))
         .layer(
             ServiceBuilder::new()
                 .layer(SetRequestIdLayer::new(
@@ -594,6 +580,13 @@ pub async fn build_router(state: AppState) -> Result<Router<AppState>, anyhow::E
                 .layer(trace_layer)
                 .layer(PropagateRequestIdLayer::new(x_request_id)),
         );
+
+    if matches!(state.config.database.r#type, DatabaseType::Postgres) {
+        router = router
+            .nest("/api/v1/auth", auth::router())
+            .nest("/api/v1/user", users::router())
+            .layer(from_fn(capture_client_meta));
+    }
 
     Ok(router)
 }
@@ -607,4 +600,37 @@ pub fn build_allowed_chars(alphabet: Option<&str>) -> HashSet<char> {
     }
 
     set
+}
+
+pub async fn build_services(
+    cfg: &Settings,
+    jwt: &JwtKeys,
+) -> Result<(Arc<AuthService>, Arc<UserService>), anyhow::Error> {
+    let (auth_svc, user_svc) = if matches!(cfg.database.r#type, DatabaseType::Postgres) {
+        let db_pool = db::make_pools(&cfg.database).await?;
+        let repos = db::make_repos(&db_pool).await;
+
+        (
+            Arc::new(AuthService::new(
+                repos.users.clone(),
+                repos.auth.clone(),
+                jwt.clone(),
+                chrono::Duration::minutes(15),
+                cfg.application.api_key.to_string(),
+            )),
+            Arc::new(UserService::new(repos.users.clone())),
+        )
+    } else {
+        (
+            Arc::new(AuthService::new(
+                Arc::new(NoopUserRepo),
+                Arc::new(NoopAuthRepo),
+                jwt.clone(),
+                chrono::Duration::minutes(15),
+                cfg.application.api_key.to_string(),
+            )),
+            Arc::new(UserService::new(Arc::new(NoopUserRepo))),
+        )
+    };
+    Ok((auth_svc, user_svc))
 }

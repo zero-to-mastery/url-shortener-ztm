@@ -37,7 +37,6 @@ use crate::database::UrlDatabase;
 use crate::features::{auth::AuthService, users::UserService};
 
 use crate::generator::ShortCodeGenerator;
-use crate::infrastructure::db;
 use crate::shortcode::bloom_filter::BloomState;
 use axum_macros::FromRef;
 use std::collections::HashSet;
@@ -90,7 +89,6 @@ use uuid::Uuid;
 /// ```
 #[derive(Clone, FromRef)]
 pub struct AppState {
-    pub db_pool: Arc<db::DbPool>,
     /// Database connection for URL storage and retrieval operations
     pub database: Arc<dyn UrlDatabase>,
     /// Short code generator for creating unique short URLs
@@ -106,6 +104,7 @@ pub struct AppState {
     pub jwt: JwtKeys,
     pub config: Settings,
 
+    // pub db_pool: Arc<db::DbPool>,
     pub auth_service: Arc<AuthService>,
     pub user_service: Arc<UserService>,
 }

@@ -19,8 +19,8 @@ application:
   pwd_pepper_b64: "3Dy73jOzO6/XcLyBXpPlXK53rLXg6DqWPyftLox2VYY="
   templates: "templates/**/*"
 database:
-  type: postgres
-  url: postgres://app:secret@localhost:5432/urlshortener
+  type: sqlite
+  url: sqlite:database.db
   create_if_missing: true
   # max_connections: 64 # set database pool connecttion
   # min_connections: 16
