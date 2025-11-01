@@ -16,6 +16,8 @@ application:
   #
   # Note: Keeping this default ensures `cargo run` works out of the box locally.
   api_key: "e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5"
+  jwt_secret_b64: "AO1Es8YQ0wYwNUjHGH8Fz4undyFD/HcWHkx6Dfzyfgc="
+  pwd_pepper_b64: "3Dy73jOzO6/XcLyBXpPlXK53rLXg6DqWPyftLox2VYY="
   templates: "templates/**/*"
 database:
   type: sqlite

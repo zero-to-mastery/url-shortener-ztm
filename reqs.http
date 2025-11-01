@@ -1,0 +1,60 @@
+@base = http://localhost:8000
+@device_id = some-unique-device-id
+@email = example@example.com
+@password = 987654321
+
+### Sign up
+POST {{base}}/api/v1/auth/sign-up
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "device_id": "{{device_id}}"
+}
+
+### Sign in
+POST {{base}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "987654321",
+  "device_id": "{{device_id}}"
+}
+
+### Refresh tokens
+POST {{base}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "device_id": "{{device_id}}"
+}
+
+### Sign out
+POST {{base}}/api/v1/auth/sign-out
+Content-Type: application/json
+
+{
+  "device_id": "{{device_id}}"
+}
+
+### Change password
+POST {{base}}/api/v1/auth/change-password
+Content-Type: application/json
+
+{
+  "old_password": "{{password}}",
+  "new_password": "987654321"
+}
+
+### Sign out all
+POST {{base}}/api/v1/auth/sign-out-all
+Content-Type: application/json
+
+{
+  "device_id": "{{device_id}}"
+}
+
+### Get current user
+GET {{base}}/api/v1/user/me

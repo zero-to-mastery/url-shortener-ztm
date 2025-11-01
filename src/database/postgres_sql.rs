@@ -334,11 +334,9 @@ impl UrlDatabase for PostgresUrlDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
         Ok(())
     }
 }
-
 /// Creates a PostgreSQL connection pool from configuration settings.
 ///
 /// # Arguments

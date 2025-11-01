@@ -146,28 +146,185 @@ function handleAuthForms() {
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     const messageDiv = document.getElementById('form-message');
+    const passwordForm = document.querySelector('.password-form');
+    const passwordMsg = document.getElementById('password-message');
 
     if (loginForm) {
-        loginForm.addEventListener('submit', (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            displayMessage('Login successful! Redirecting...', 'success', messageDiv);
-            // In a real app, you would make an API call here.
-            setTimeout(() => window.location.href = '/admin', 1500);
+
+            const submitBtn = loginForm.querySelector('button[type="submit"]');
+            submitBtn && (submitBtn.disabled = true);
+
+            const email = loginForm.querySelector('#email')?.value?.trim();
+            const password = loginForm.querySelector('#password')?.value;
+            if (!email || !password) {
+                displayMessage('Please enter email and password.', 'error', messageDiv);
+                submitBtn && (submitBtn.disabled = false);
+                return;
+            }
+
+            const payload = {
+                email,
+                password,
+                device_id: getDeviceId(),
+            };
+
+            try {
+                const res = await fetch('/api/v1/auth/sign-in', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(payload),
+                });
+
+                const contentType = res.headers.get('content-type') || '';
+                const maybeJson = contentType.includes('application/json');
+                const body = maybeJson ? await res.json().catch(() => ({})) : {};
+
+                if (res.ok) {
+                    displayMessage('Login successful! Redirecting...', 'success', messageDiv);
+                    setTimeout(() => (window.location.href = '/admin'), 700);
+                } else {
+                    const msg = body?.message || 'Login failed. Please check your credentials.';
+                    displayMessage(msg, 'error', messageDiv);
+                }
+            } catch (err) {
+                console.error('Login error:', err);
+                displayMessage('Network error. Please try again.', 'error', messageDiv);
+            } finally {
+                submitBtn && (submitBtn.disabled = false);
+            }
         });
     }
 
     if (registerForm) {
-        registerForm.addEventListener('submit', (e) => {
+        registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            displayMessage('Registration successful! Please log in.', 'success', messageDiv);
-            // In a real app, you would make an API call here.
-            setTimeout(() => window.location.href = '/admin/login', 1500);
+
+            const submitBtn = registerForm.querySelector('button[type="submit"]');
+            submitBtn && (submitBtn.disabled = true);
+
+            const displayName = registerForm.querySelector('#username')?.value?.trim();
+            const email = registerForm.querySelector('#email')?.value?.trim();
+            const password = registerForm.querySelector('#password')?.value;
+            if (!email || !password) {
+                displayMessage('Please complete all required fields.', 'error', messageDiv);
+                submitBtn && (submitBtn.disabled = false);
+                return;
+            }
+
+            const payload = {
+                email,
+                password,
+                display_name: displayName || undefined,
+                device_id: getDeviceId(),
+            };
+
+            try {
+                const res = await fetch('/api/v1/auth/sign-up', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(payload),
+                });
+
+                const contentType = res.headers.get('content-type') || '';
+                const maybeJson = contentType.includes('application/json');
+                const body = maybeJson ? await res.json().catch(() => ({})) : {};
+
+                if (res.ok) {
+                    displayMessage('Registration successful! Redirecting...', 'success', messageDiv);
+                    setTimeout(() => (window.location.href = '/admin'), 700);
+                } else {
+                    const msg = body?.message || 'Registration failed. Please try again.';
+                    displayMessage(msg, 'error', messageDiv);
+                }
+            } catch (err) {
+                console.error('Registration error:', err);
+                displayMessage('Network error. Please try again.', 'error', messageDiv);
+            } finally {
+                submitBtn && (submitBtn.disabled = false);
+            }
+        });
+    }
+
+    if (passwordForm) {
+        passwordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = passwordForm.querySelector('button[type="submit"]');
+            submitBtn && (submitBtn.disabled = true);
+
+            const oldPassword = document.getElementById('current-password')?.value;
+            const newPassword = document.getElementById('new-password')?.value;
+            const confirmPassword = document.getElementById('confirm-password')?.value;
+
+            if (!oldPassword || !newPassword || !confirmPassword) {
+                displayMessage('Please complete all required fields.', 'error', passwordMsg);
+                submitBtn && (submitBtn.disabled = false);
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                displayMessage('New password and confirmation do not match.', 'error', passwordMsg);
+                submitBtn && (submitBtn.disabled = false);
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/v1/auth/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword,
+                    }),
+                });
+
+                if (res.status === 401) {
+                    // Not authenticated; send to login
+                    window.location.href = '/admin/login';
+                    return;
+                }
+
+                const contentType = res.headers.get('content-type') || '';
+                const maybeJson = contentType.includes('application/json');
+                const body = maybeJson ? await res.json().catch(() => ({})) : {};
+
+                if (res.ok) {
+                    displayMessage('Password changed successfully.', 'success', passwordMsg);
+                    // Clear inputs for safety
+                    document.getElementById('current-password').value = '';
+                    document.getElementById('new-password').value = '';
+                    document.getElementById('confirm-password').value = '';
+                } else {
+                    const msg = body?.message || 'Failed to change password.';
+                    displayMessage(msg, 'error', passwordMsg);
+                }
+            } catch (err) {
+                console.error('Change password error:', err);
+                displayMessage('Network error. Please try again.', 'error', passwordMsg);
+            } finally {
+                submitBtn && (submitBtn.disabled = false);
+            }
         });
     }
 }
 
 function displayMessage(message, type, element) {
     if (!element) return;
+    element.style.display = 'block';
     element.textContent = message;
     element.className = `form-message ${type}`; // 'success' or 'error'
 }
@@ -199,6 +356,23 @@ function initUserSearch() {
             }
         });
     });
+}
+
+/**
+ * Returns a stable device identifier for tying refresh sessions to a device.
+ * Stored in localStorage. Falls back to a random string if crypto is unavailable.
+ */
+function getDeviceId() {
+    try {
+        const KEY = 'device_id';
+        let id = localStorage.getItem(KEY);
+        if (id) return id;
+        id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem(KEY, id);
+        return id;
+    } catch (_) {
+        return 'web-' + Math.random().toString(36).slice(2);
+    }
 }
 
 /**

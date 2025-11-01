@@ -31,7 +31,11 @@
 //! ```
 
 use crate::configuration::Settings;
+use crate::core::security::jwt::JwtKeys;
+
 use crate::database::UrlDatabase;
+use crate::features::{auth::AuthService, users::UserService};
+
 use crate::generator::ShortCodeGenerator;
 use crate::shortcode::bloom_filter::BloomState;
 use axum_macros::FromRef;
@@ -97,70 +101,12 @@ pub struct AppState {
     pub api_key: Uuid,
     /// Directory path containing Tera template files for web interface
     pub template_dir: String,
+    pub jwt: JwtKeys,
     pub config: Settings,
+
+    // pub db_pool: Arc<db::DbPool>,
+    pub auth_service: Arc<AuthService>,
+    pub user_service: Arc<UserService>,
 }
 
-impl AppState {
-    /// Creates a new application state instance.
-    ///
-    /// This constructor initializes the application state with all required dependencies.
-    /// The state will be shared across all request handlers and must be thread-safe.
-    ///
-    /// # Arguments
-    ///
-    /// * `database` - Database connection wrapped in `Arc` for shared ownership
-    /// * `api_key` - UUID-based API key for authentication
-    /// * `template_dir` - Directory path containing Tera template files
-    /// * `config` - Application configuration settings
-    ///
-    /// # Returns
-    ///
-    /// Returns a new `AppState` instance ready for use with Axum handlers.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use url_shortener_ztm_lib::state::AppState;
-    /// use url_shortener_ztm_lib::DatabaseType;
-    /// use url_shortener_ztm_lib::database::SqliteUrlDatabase;
-    /// use url_shortener_ztm_lib::configuration::{DatabaseSettings, Settings};
-    /// use std::sync::Arc;
-    /// use uuid::Uuid;
-    ///
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = DatabaseSettings {
-    ///     r#type: DatabaseType::Sqlite,
-    ///     url: "database.db".to_string(),
-    ///     create_if_missing: true,
-    ///     max_connections: Some(16),
-    ///     min_connections: Some(4),
-    /// };
-    /// let database = Arc::new(SqliteUrlDatabase::from_config(&config).await?);
-    /// let api_key = Uuid::parse_str("e4125dd1-3d3e-43a1-bc9c-dc0ba12ad4b5")?;
-    /// let template_dir = "templates".to_string();
-    /// // let settings = Settings::new().unwrap(); // Get from configuration
-    ///
-    /// // let state = AppState::new(database, api_key, template_dir, settings);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn new(
-        database: Arc<dyn UrlDatabase>,
-        code_generator: Arc<dyn ShortCodeGenerator>,
-        blooms: BloomState,
-        allowed_chars: HashSet<char>,
-        api_key: Uuid,
-        template_dir: String,
-        config: Settings,
-    ) -> Self {
-        Self {
-            database,
-            code_generator,
-            blooms,
-            allowed_chars,
-            template_dir,
-            api_key,
-            config,
-        }
-    }
-}
+impl AppState {}
