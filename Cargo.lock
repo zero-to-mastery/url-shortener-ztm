@@ -184,6 +184,7 @@ dependencies = [
  "axum",
  "axum-core",
  "bytes",
+ "cookie",
  "futures-util",
  "headers",
  "http",
@@ -399,6 +400,17 @@ name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
+
+[[package]]
+name = "cookie"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ddef33a339a91ea89fb53151bd0a4689cfce27055c291dfa69945475d22c747"
+dependencies = [
+ "percent-encoding",
+ "time",
+ "version_check",
+]
 
 [[package]]
 name = "core-foundation"
@@ -1372,6 +1384,15 @@ name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
+
+[[package]]
+name = "ipnetwork"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf466541e9d546596ee94f9f69590f89473455f88372423e0008fc1a7daf100e"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "iri-string"
@@ -2701,6 +2722,7 @@ dependencies = [
  "hashbrown 0.15.5",
  "hashlink",
  "indexmap",
+ "ipnetwork",
  "log",
  "memchr",
  "once_cell",
@@ -2822,6 +2844,7 @@ dependencies = [
  "hkdf",
  "hmac",
  "home",
+ "ipnetwork",
  "itoa",
  "log",
  "md-5",
@@ -3499,6 +3522,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "axum-macros",
+ "base64",
  "chrono",
  "email_address",
  "fastbloom-rs",
@@ -3519,6 +3543,7 @@ dependencies = [
  "sqlx",
  "tera",
  "thiserror 2.0.17",
+ "time",
  "tokio",
  "tower",
  "tower-http",

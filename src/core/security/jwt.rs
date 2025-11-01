@@ -1,7 +1,12 @@
+use argon2::password_hash::rand_core::{OsRng, RngCore};
+use base64::Engine;
 use chrono::{Duration, Utc};
+use hmac::Mac;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::core::security::HmacSha256;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
@@ -19,9 +24,10 @@ pub struct JwtKeys {
 
 impl JwtKeys {
     pub fn new(secret: &[u8]) -> Self {
-        let mut val = Validation::default();
-        val.algorithms = vec![Algorithm::HS256];
-        val.leeway = 60;
+        let mut val = Validation::new(Algorithm::HS256);
+        val.leeway = 60; // allow 60 seconds of clock skew
+        val.validate_exp = true; // ensure exp is validated
+        val.validate_nbf = false; // not using nbf
 
         Self {
             enc: EncodingKey::from_secret(secret),
@@ -42,8 +48,24 @@ impl JwtKeys {
 
     pub fn verify(&self, token: &str) -> anyhow::Result<Claims> {
         let token_data = decode::<Claims>(token, &self.dec, &self.validation)?;
-        let claims = token_data.claims;
 
-        Ok(claims)
+        Ok(token_data.claims)
+    }
+}
+
+pub fn gen_refresh_token() -> String {
+    let mut buf = [0u8; 48];
+    OsRng.fill_bytes(&mut buf);
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(buf)
+}
+
+pub fn hash_refresh_token(token: &str, pepper: &str) -> anyhow::Result<Vec<u8>> {
+    let mac = HmacSha256::new_from_slice(pepper.as_bytes());
+    match mac {
+        Ok(mut m) => {
+            m.update(token.as_bytes());
+            Ok(m.finalize().into_bytes().to_vec())
+        }
+        Err(e) => Err(anyhow::anyhow!("HMAC error: {}", e)),
     }
 }

@@ -23,11 +23,16 @@
 //! ```
 use crate::response::ApiResponse;
 use crate::state::AppState;
+
 use axum::{
-    extract::{Request, State},
+    extract::{ConnectInfo, Request, State},
     http::StatusCode,
     middleware::Next,
     response::{IntoResponse, Response},
+};
+use std::{
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
 };
 use uuid::Uuid;
 
@@ -106,4 +111,47 @@ pub async fn check_api_key(
     } else {
         ApiResponse::<()>::error("Unauthorized", StatusCode::UNAUTHORIZED).into_response()
     }
+}
+
+// src/middleware/client_meta.rs
+
+#[derive(Clone, Debug)]
+pub struct ClientMeta {
+    pub ip: Option<IpAddr>,
+    pub user_agent: Option<String>,
+}
+
+pub async fn capture_client_meta(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    mut req: Request,
+    next: Next,
+) -> Response {
+    let xff = req
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next().map(str::trim))
+        .and_then(|s| IpAddr::from_str(s).ok());
+
+    // 2) X-Real-IP
+    let xri = req
+        .headers()
+        .get("x-real-ip")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| IpAddr::from_str(s).ok());
+
+    // 3) Socket IP
+    let from_socket = Some(addr.ip());
+
+    let ip = xff.or(xri).or(from_socket);
+
+    let ua = req
+        .headers()
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    req.extensions_mut()
+        .insert(ClientMeta { ip, user_agent: ua });
+    next.run(req).await
 }

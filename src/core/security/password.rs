@@ -2,9 +2,9 @@ use argon2::{
     Argon2, PasswordHash,
     password_hash::{self, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
-type HmacSha256 = Hmac<Sha256>;
+use hmac::Mac;
+
+use crate::core::security::HmacSha256;
 
 pub fn hash_password(pwd: &str, pepper: &str) -> anyhow::Result<Vec<u8>> {
     let salt = SaltString::generate(&mut OsRng);

@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO refresh_token_devices (user_id, device_id, current_hash, absolute_expires, user_agent, ip)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (user_id, device_id)\n            DO UPDATE SET\n                current_hash = EXCLUDED.current_hash,\n                previous_hash = refresh_token_devices.current_hash,\n                last_rotated_at = NOW(),\n                absolute_expires = EXCLUDED.absolute_expires,\n                user_agent = EXCLUDED.user_agent,\n                ip = EXCLUDED.ip,\n                revoked_at = NULL\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bytea",
+        "Timestamptz",
+        "Text",
+        "Inet"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "79222a102ae9f9af5bb7f6b6432647152f7598ca5ae3b464fd9c9030cc799f24"
+}

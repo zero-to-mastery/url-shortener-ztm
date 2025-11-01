@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -12,7 +14,8 @@ pub struct RefreshDevice {
     pub absolute_expires: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
     pub user_agent: Option<String>,
-    pub ip: Option<String>,
+    pub ip: Option<IpAddr>,
+    pub last_rotated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone)]
@@ -34,47 +37,39 @@ pub struct PasswordResetCode {
 }
 
 #[async_trait]
+#[async_trait]
 pub trait AuthRepository: Send + Sync {
-    // // === Refresh Token Devices ===
-    // async fn insert_refresh_device(&self, record: RefreshDevice) -> anyhow::Result<()>;
-    // async fn find_refresh_device(
-    //     &self,
-    //     user_id: Uuid,
-    //     device_id: &str,
-    // ) -> anyhow::Result<Option<RefreshDevice>>;
-    // async fn update_refresh_hash(
-    //     &self,
-    //     user_id: Uuid,
-    //     device_id: &str,
-    //     new_hash: Vec<u8>,
-    //     old_hash: Option<Vec<u8>>,
-    // ) -> anyhow::Result<()>;
-    // async fn revoke_refresh(&self, user_id: Uuid, device_id: &str) -> anyhow::Result<()>;
-    // async fn revoke_all_refresh(&self, user_id: Uuid) -> anyhow::Result<()>;
+    async fn upsert_refresh_device(
+        &self,
+        user_id: Uuid,
+        device_id: &str,
+        current_hash: &[u8],
+        absolute_expires: DateTime<Utc>,
+        user_agent: Option<&str>,
+        ip: Option<IpAddr>,
+    ) -> anyhow::Result<i32>;
 
-    // // === Email Verification ===
-    // async fn insert_email_code(&self, code: EmailVerification) -> anyhow::Result<()>;
-    // async fn find_email_code(
-    //     &self,
-    //     user_id: Uuid,
-    //     code: &str,
-    // ) -> anyhow::Result<Option<EmailVerification>>;
-    // async fn mark_email_code_used(&self, id: i32) -> anyhow::Result<()>;
+    async fn get_refresh_device_by_rt(
+        &self,
+        device_id: &str,
+        rt_hash: &[u8],
+    ) -> anyhow::Result<Option<RefreshDevice>>;
 
-    // // === Password Reset ===
-    // async fn insert_pw_reset_code(&self, code: PasswordResetCode) -> anyhow::Result<()>;
-    // async fn find_pw_reset_code(
-    //     &self,
-    //     user_id: Uuid,
-    //     code: &str,
-    // ) -> anyhow::Result<Option<PasswordResetCode>>;
-    // async fn mark_pw_reset_used(&self, id: i32) -> anyhow::Result<()>;
+    async fn get_refresh_device_by_user_id(
+        &self,
+        device_id: &str,
+        user_id: Uuid,
+    ) -> anyhow::Result<Option<RefreshDevice>>;
 
-    // // === Login attempts / audit ===
-    // async fn record_login_attempt(
-    //     &self,
-    //     user_id: Option<Uuid>,
-    //     ip: Option<String>,
-    //     success: bool,
-    // ) -> anyhow::Result<()>;
+    async fn rotate_refresh_hash(
+        &self,
+        id: i32,
+        new_hash: &[u8],
+        rotated_at: DateTime<Utc>,
+    ) -> anyhow::Result<()>;
+
+    async fn set_previous_hash(&self, id: i32, prev: Option<&[u8]>) -> anyhow::Result<()>;
+
+    async fn revoke_device(&self, id: i32) -> anyhow::Result<()>;
+    async fn revoke_all(&self, user_id: Uuid) -> anyhow::Result<()>;
 }

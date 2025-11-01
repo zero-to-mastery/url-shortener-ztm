@@ -62,14 +62,15 @@ use crate::routes::{
     get_admin_dashboard, get_index, get_login, get_redirect, get_register, get_user_profile,
     health_check, post_shorten, serve_openapi_spec, serve_swagger_ui,
 };
+use axum::middleware::from_fn;
 use tokio::time::Duration as TokioDuration;
 
-use crate::DatabaseType;
 use crate::shortcode::bloom_filter::{
     S2L_SNAPSHOT_KEY, build_bloom_state, not_disable_bf_snapshots,
 };
 use crate::state::AppState;
 use crate::telemetry::MakeRequestUuid;
+use crate::{DatabaseType, capture_client_meta};
 use anyhow::{Context, Result};
 use axum::http::{Request, Response};
 use axum::{
@@ -571,7 +572,6 @@ pub async fn build_router(state: AppState) -> Result<Router<AppState>, anyhow::E
         .route("/admin/profile", get(get_user_profile))
         .route("/admin/login", get(get_login))
         .route("/admin/register", get(get_register));
-    // TODO: Add session-based auth middleware once implemented
 
     let auth_router = auth::router();
     let user_router = users::router();
@@ -582,9 +582,9 @@ pub async fn build_router(state: AppState) -> Result<Router<AppState>, anyhow::E
         .merge(public_shorten)
         .merge(protected_api)
         .merge(protected_admin)
-        .with_state(state)
         .nest("/api/v1/auth", auth_router)
         .nest("/api/v1/user", user_router)
+        .layer(from_fn(capture_client_meta))
         .layer(
             ServiceBuilder::new()
                 .layer(SetRequestIdLayer::new(

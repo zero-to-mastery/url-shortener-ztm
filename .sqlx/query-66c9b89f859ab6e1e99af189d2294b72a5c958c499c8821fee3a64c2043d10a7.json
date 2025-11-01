@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE refresh_token_devices\n            SET previous_hash = current_hash,\n                current_hash = $1,\n                last_rotated_at = $2\n            WHERE id = $3\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Timestamptz",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "66c9b89f859ab6e1e99af189d2294b72a5c958c499c8821fee3a64c2043d10a7"
+}

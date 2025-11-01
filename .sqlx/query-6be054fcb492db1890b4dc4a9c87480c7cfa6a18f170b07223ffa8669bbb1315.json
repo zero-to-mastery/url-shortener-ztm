@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, user_id, device_id, current_hash, previous_hash, absolute_expires,\n                    revoked_at, user_agent, ip, last_rotated_at\n            FROM refresh_token_devices\n            WHERE device_id = $1 AND current_hash = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "device_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "current_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 4,
+        "name": "previous_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 5,
+        "name": "absolute_expires",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "revoked_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "user_agent",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "ip",
+        "type_info": "Inet"
+      },
+      {
+        "ordinal": 9,
+        "name": "last_rotated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "6be054fcb492db1890b4dc4a9c87480c7cfa6a18f170b07223ffa8669bbb1315"
+}

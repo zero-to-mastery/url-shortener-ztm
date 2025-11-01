@@ -61,10 +61,9 @@ where
 {
     // Try cookie first
     if let Ok(TypedHeader(cookies)) = TypedHeader::<Cookie>::from_request_parts(parts, state).await
+        && let Some(token) = cookies.get("access_token")
     {
-        if let Some(token) = cookies.get("access_token") {
-            return Some(token.to_owned());
-        }
+        return Some(token.to_owned());
     }
 
     // Fall back to Authorization header

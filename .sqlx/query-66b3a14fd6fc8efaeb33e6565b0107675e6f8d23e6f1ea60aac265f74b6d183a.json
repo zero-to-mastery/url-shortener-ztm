@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE refresh_token_devices SET previous_hash = $1 WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "66b3a14fd6fc8efaeb33e6565b0107675e6f8d23e6f1ea60aac265f74b6d183a"
+}
