@@ -616,8 +616,14 @@ pub async fn build_services(
     jwt: &JwtKeys,
 ) -> Result<(Arc<AuthService>, Arc<UserService>), anyhow::Error> {
     let email_service = EmailService::new(
-        cfg.application.email_svc_api_key.as_deref().unwrap_or_default(),
-        cfg.application.email_svc_address.as_deref().unwrap_or_default()
+        cfg.application
+            .email_svc_api_key
+            .as_deref()
+            .unwrap_or_default(),
+        cfg.application
+            .email_svc_address
+            .as_deref()
+            .unwrap_or_default(),
     );
 
     let (auth_svc, user_svc) = if matches!(cfg.database.r#type, DatabaseType::Postgres) {
