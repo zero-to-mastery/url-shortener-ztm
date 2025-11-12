@@ -105,9 +105,9 @@ pub struct ApplicationSettings {
     /// UUID-based API key for authenticating requests to protected endpoints
     pub api_key: Uuid,
     /// API key for the email service
-    pub email_svc_api_key: String,
+    pub email_svc_api_key: Option<String>,
     /// From address for sending emails
-    pub email_svc_address: String,
+    pub email_svc_address: Option<String>,
     /// Directory path containing Tera template files
     pub templates: String,
 
