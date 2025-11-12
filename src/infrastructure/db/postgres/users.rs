@@ -68,6 +68,14 @@ impl UserRepository for PgUserRepository {
         }))
     }
 
+    async fn confirm_email(&self, id: Uuid) -> anyhow::Result<()> {
+        sqlx::query("UPDATE users SET is_email_verified = TRUE WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     async fn email_exists(&self, email: &str) -> anyhow::Result<bool> {
         let exists =
             sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)")

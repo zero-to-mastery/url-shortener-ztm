@@ -1,6 +1,8 @@
 use super::{dto::*, services::AuthService};
 use crate::{
-    ApiError, ApiResponse, AppState, ClientMeta, core::extractors::auth_user::AuthenticatedUser,
+    ApiError, ApiResponse, AppState, ClientMeta,
+    core::extractors::auth_user::AuthenticatedUser,
+    features::{auth::repositories::AuthenticationAction, users::UserService},
 };
 use axum::{
     Extension, Json,
@@ -20,13 +22,15 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AuthController {
-    pub svc: Arc<AuthService>,
+    pub auth_svc: Arc<AuthService>,
+    pub user_svc: Arc<UserService>,
 }
 
 impl FromRef<AppState> for AuthController {
     fn from_ref(app: &AppState) -> Self {
         Self {
-            svc: app.auth_service.clone(),
+            auth_svc: app.auth_service.clone(),
+            user_svc: app.user_service.clone(),
         }
     }
 }
@@ -38,7 +42,7 @@ pub async fn sign_up(
     Json(req): Json<SignUpReq>,
 ) -> Result<impl IntoResponse, ApiError> {
     let bundle = ctrl
-        .svc
+        .auth_svc
         .sign_up(req, meta.ip)
         .await
         .map_err(|e| ApiError::Unprocessable(e.to_string()))?;
@@ -57,7 +61,7 @@ pub async fn sign_in(
     Json(req): Json<SignInReq>,
 ) -> Result<impl IntoResponse, ApiError> {
     let bundle = ctrl
-        .svc
+        .auth_svc
         .sign_in(req, meta.ip)
         .await
         .map_err(|_| ApiError::Unauthorized("invalid credentials".into()))?;
@@ -86,7 +90,7 @@ pub async fn refresh(
         .ok_or_else(|| ApiError::Unauthorized("missing refresh_token".into()))?;
 
     let bundle = ctrl
-        .svc
+        .auth_svc
         .refresh(&rt, &req.device_id)
         .await
         .map_err(|e| ApiError::Unauthorized(e.to_string()))?;
@@ -103,7 +107,7 @@ pub async fn sign_out(
     user: AuthenticatedUser,
     Json(req): Json<RefreshReq>,
 ) -> Result<ApiResponse<()>, ApiError> {
-    ctrl.svc
+    ctrl.auth_svc
         .sign_out(user.user_id, &req.device_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -114,7 +118,7 @@ pub async fn sign_out_all(
     State(ctrl): State<AuthController>,
     user: AuthenticatedUser,
 ) -> Result<ApiResponse<()>, ApiError> {
-    ctrl.svc
+    ctrl.auth_svc
         .sign_out_all(user.user_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -126,10 +130,87 @@ pub async fn change_password(
     user: AuthenticatedUser,
     Json(req): Json<ChangePasswordReq>,
 ) -> Result<ApiResponse<()>, ApiError> {
-    ctrl.svc
-        .change_password(user.user_id, req.old_password, req.new_password)
+    ctrl.auth_svc
+        .change_password(user.user_id, &req.old_password, &req.new_password)
         .await
         .map_err(|e| ApiError::Unprocessable(e.to_string()))?;
+    Ok(ApiResponse::success(()))
+}
+
+pub async fn email_verification_request(
+    State(ctrl): State<AuthController>,
+    user: AuthenticatedUser,
+) -> Result<ApiResponse<()>, ApiError> {
+    let usr = ctrl
+        .user_svc
+        .me(user.user_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    ctrl.auth_svc
+        .send_verification_code(user.user_id, &usr.email, AuthenticationAction::VerifyEmail)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(ApiResponse::success(()))
+}
+
+pub async fn email_verification_confirm(
+    State(ctrl): State<AuthController>,
+    user: AuthenticatedUser,
+    Json(req): Json<EmailVerificationConfirmReq>,
+) -> Result<ApiResponse<()>, ApiError> {
+    ctrl.auth_svc
+        .verify_code(user.user_id, AuthenticationAction::VerifyEmail, &req.code)
+        .await
+        .map_err(|e| ApiError::Unprocessable(e.to_string()))?;
+
+    ctrl.user_svc
+        .confirm_email(user.user_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(ApiResponse::success(()))
+}
+
+pub async fn pw_reset_request(
+    State(ctrl): State<AuthController>,
+    Json(req): Json<PwResetRequestReq>,
+) -> Result<ApiResponse<()>, ApiError> {
+    let usr = ctrl
+        .user_svc
+        .get_user_by_email(&req.email)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    ctrl.auth_svc
+        .send_verification_code(usr.id, &usr.email, AuthenticationAction::ResetPassword)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(ApiResponse::success(()))
+}
+
+pub async fn pw_reset_confirm(
+    State(ctrl): State<AuthController>,
+    Json(req): Json<PwResetConfirmReq>,
+) -> Result<ApiResponse<()>, ApiError> {
+    let usr = ctrl
+        .user_svc
+        .get_user_by_email(&req.email)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    ctrl.auth_svc
+        .verify_code(usr.id, AuthenticationAction::ResetPassword, &req.code)
+        .await
+        .map_err(|e| ApiError::Unprocessable(e.to_string()))?;
+
+    ctrl.auth_svc
+        .reset_password(usr.id, &req.new_password)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
     Ok(ApiResponse::success(()))
 }
 

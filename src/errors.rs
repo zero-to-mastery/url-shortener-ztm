@@ -73,6 +73,15 @@ use axum::response::{IntoResponse, Response};
 /// ```
 #[derive(thiserror::Error)]
 pub enum ApiError {
+    #[error("cooldown not finished")]
+    Cooldown,
+    #[error("already have an active challenge")]
+    AlreadyActive,
+    #[error("email already taken")]
+    EmailTaken,
+    #[error("challenge expired or invalid")]
+    InvalidOrExpired,
+
     /// Bad request error - client sent invalid data
     #[error("Bad request: {0}")]
     BadRequest(String),
@@ -132,6 +141,19 @@ impl IntoResponse for ApiError {
     /// ```
     fn into_response(self) -> Response {
         let (status, message) = match self {
+            ApiError::Cooldown => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "Cooldown not finished".into(),
+            ),
+            ApiError::AlreadyActive => (
+                StatusCode::BAD_REQUEST,
+                "Already have an active challenge".into(),
+            ),
+            ApiError::EmailTaken => (StatusCode::BAD_REQUEST, "Email already taken".into()),
+            ApiError::InvalidOrExpired => (
+                StatusCode::BAD_REQUEST,
+                "Challenge expired or invalid".into(),
+            ),
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),

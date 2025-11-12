@@ -59,6 +59,7 @@ use crate::features::users::repositories::NoopUserRepo;
 use crate::features::users::services::UserService;
 use crate::generator::{DEFAULT_ALPHABET, build_generator};
 use crate::infrastructure::db::{self};
+use crate::infrastructure::email::EmailService;
 use crate::middleware::check_api_key;
 use crate::routes::{
     get_admin_dashboard, get_analytics, get_index, get_login, get_redirect, get_register, get_urls,
@@ -614,10 +615,14 @@ pub async fn build_services(
     cfg: &Settings,
     jwt: &JwtKeys,
 ) -> Result<(Arc<AuthService>, Arc<UserService>), anyhow::Error> {
+    let email_service = EmailService::new(
+        &cfg.application.email_svc_api_key,
+        &cfg.application.email_svc_address,
+    );
+
     let (auth_svc, user_svc) = if matches!(cfg.database.r#type, DatabaseType::Postgres) {
         let db_pool = db::make_pools(&cfg.database).await?;
         let repos = db::make_repos(&db_pool).await;
-
         (
             Arc::new(AuthService::new(
                 repos.users.clone(),
@@ -625,6 +630,7 @@ pub async fn build_services(
                 jwt.clone(),
                 chrono::Duration::minutes(15),
                 cfg.application.api_key.to_string(),
+                email_service,
             )),
             Arc::new(UserService::new(repos.users.clone())),
         )
@@ -636,6 +642,7 @@ pub async fn build_services(
                 jwt.clone(),
                 chrono::Duration::minutes(15),
                 cfg.application.api_key.to_string(),
+                email_service,
             )),
             Arc::new(UserService::new(Arc::new(NoopUserRepo))),
         )
