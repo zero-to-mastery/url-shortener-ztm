@@ -26,6 +26,7 @@ pub trait UserRepository: Send + Sync {
     async fn find_user_by_email(&self, email: &str) -> anyhow::Result<Option<User>>;
     async fn find_user_by_id(&self, id: Uuid) -> anyhow::Result<Option<User>>;
     async fn email_exists(&self, email: &str) -> anyhow::Result<bool>;
+    async fn confirm_email(&self, id: Uuid) -> anyhow::Result<()>;
 
     async fn set_last_login(&self, id: Uuid, at: DateTime<Utc>) -> anyhow::Result<()>;
 
@@ -43,6 +44,9 @@ pub struct NoopUserRepo;
 impl UserRepository for NoopUserRepo {
     async fn create(&self, _e: &str, _p: &[u8], _d: Option<String>) -> anyhow::Result<User> {
         anyhow::bail!("NoopUserRepo: create not supported in sqlite tests")
+    }
+    async fn confirm_email(&self, _id: Uuid) -> anyhow::Result<()> {
+        Ok(())
     }
     async fn find_user_by_email(&self, _email: &str) -> anyhow::Result<Option<User>> {
         Ok(None)

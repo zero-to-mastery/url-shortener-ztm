@@ -15,8 +15,6 @@ ALTER TABLE aliases
 
 DROP TABLE IF EXISTS api_keys;
 DROP TABLE IF EXISTS refresh_token_devices;
-DROP TABLE IF EXISTS email_verifications;
-DROP TABLE IF EXISTS email_change_requests;
 DROP TABLE IF EXISTS sign_in_attempts;
 DROP TABLE IF EXISTS users;
 

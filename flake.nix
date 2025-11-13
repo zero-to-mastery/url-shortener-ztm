@@ -66,7 +66,7 @@
             nixfmt-rfc-style.enable = true;
 
             # Rust formatting (disabled by default)
-            # rustfmt.enable = true;
+            rustfmt.enable = true;
 
             # Clippy linting (enable by default)
             clippy = {

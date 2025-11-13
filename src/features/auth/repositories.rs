@@ -2,6 +2,9 @@ use std::net::IpAddr;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use sqlx::Type;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -36,7 +39,45 @@ pub struct PasswordResetCode {
     pub used_at: Option<DateTime<Utc>>,
 }
 
-#[async_trait]
+#[derive(Debug, Clone, PartialEq, Eq, Type, Serialize, Deserialize)]
+#[sqlx(type_name = "authentication_action")]
+#[sqlx(rename_all = "snake_case")]
+pub enum AuthenticationAction {
+    VerifyEmail,
+    ResetPassword,
+    ChangeEmail,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct AuthenticationChallenge {
+    pub id: i64,
+    pub user_id: Uuid,
+    pub action: AuthenticationAction,
+    pub target: Option<String>,
+    pub code_hash: Vec<u8>,
+    pub attempts: u8,
+    pub meta: Option<Value>,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub confirmed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AuthRepoError {
+    #[error("cooldown: {0} seconds remaining")]
+    Cooldown(i32),
+    #[error("already active challenge")]
+    AlreadyActive,
+    #[error("email already taken")]
+    EmailTaken,
+    #[error("not found")]
+    NotFound,
+    #[error("transient error")]
+    Transient,
+    #[error("internal storage error")]
+    Internal,
+}
+
 #[async_trait]
 pub trait AuthRepository: Send + Sync {
     async fn upsert_refresh_device(
@@ -72,6 +113,33 @@ pub trait AuthRepository: Send + Sync {
 
     async fn revoke_device(&self, id: i32) -> anyhow::Result<()>;
     async fn revoke_all(&self, user_id: Uuid) -> anyhow::Result<()>;
+
+    #[allow(clippy::too_many_arguments)]
+    async fn create_or_refresh_auth_challenge(
+        &self,
+        user_id: Uuid,
+        action: AuthenticationAction,
+        target: Option<&str>,
+        code_hash: &[u8],
+        meta: Option<&Value>,
+        expires_at: DateTime<Utc>,
+        cooldown_secs: Option<i32>,
+    ) -> Result<(), AuthRepoError>;
+    async fn get_auth_challenge(
+        &self,
+        user_id: Uuid,
+        action: AuthenticationAction,
+    ) -> Result<Option<AuthenticationChallenge>, AuthRepoError>;
+    async fn increase_auth_challenge_attempts(
+        &self,
+        challenge_id: i64,
+    ) -> Result<(), AuthRepoError>;
+    async fn confirm_authentication_challenge(
+        &self,
+        user_id: Uuid,
+        action: AuthenticationAction,
+        confirmed_at: DateTime<Utc>,
+    ) -> Result<(), AuthRepoError>;
 }
 
 // A no-operation implementation of AuthRepository for testing purposes.
@@ -126,6 +194,40 @@ impl AuthRepository for NoopAuthRepo {
     }
 
     async fn revoke_all(&self, _user_id: Uuid) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    async fn create_or_refresh_auth_challenge(
+        &self,
+        _user_id: Uuid,
+        _action: AuthenticationAction,
+        _target: Option<&str>,
+        _code_hash: &[u8],
+        _meta: Option<&Value>,
+        _expires_at: DateTime<Utc>,
+        _cooldown_secs: Option<i32>,
+    ) -> Result<(), AuthRepoError> {
+        Ok(())
+    }
+    async fn get_auth_challenge(
+        &self,
+        _user_id: Uuid,
+        _action: AuthenticationAction,
+    ) -> Result<Option<AuthenticationChallenge>, AuthRepoError> {
+        Ok(None)
+    }
+    async fn increase_auth_challenge_attempts(
+        &self,
+        _challenge_id: i64,
+    ) -> Result<(), AuthRepoError> {
+        Ok(())
+    }
+    async fn confirm_authentication_challenge(
+        &self,
+        _user_id: Uuid,
+        _action: AuthenticationAction,
+        _confirmed_at: DateTime<Utc>,
+    ) -> Result<(), AuthRepoError> {
         Ok(())
     }
 }

@@ -1,15 +1,34 @@
 use std::net::IpAddr;
 
+use crate::features::auth::repositories::{
+    AuthRepoError, AuthRepository, AuthenticationAction, AuthenticationChallenge, RefreshDevice,
+};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sqlx::{PgPool, Row, types::ipnetwork::IpNetwork};
+use serde_json::Value;
+use sqlx::{PgPool, Row, Type, types::ipnetwork::IpNetwork};
 use uuid::Uuid;
-
-use crate::features::auth::repositories::{AuthRepository, RefreshDevice};
 
 #[derive(Clone)]
 pub struct PgAuthRepository {
     pub pool: PgPool,
+}
+
+#[derive(Type, Debug, Clone, Copy, PartialEq, Eq)]
+#[sqlx(type_name = "challenge_upsert_status")]
+#[sqlx(rename_all = "snake_case")]
+enum UpsertStatus {
+    Inserted,
+    Updated,
+    Cooldown,
+}
+
+#[derive(sqlx::FromRow)]
+struct UpsertRow {
+    status: UpsertStatus,
+    #[sqlx(rename = "challenge_id")]
+    _challenge_id: i64,
+    seconds_remaining: i32,
 }
 
 #[async_trait]
@@ -161,5 +180,139 @@ impl AuthRepository for PgAuthRepository {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    async fn create_or_refresh_auth_challenge(
+        &self,
+        user_id: Uuid,
+        action: AuthenticationAction,
+        target: Option<&str>,
+        code_hash: &[u8],
+        meta: Option<&Value>,
+        expires_at: DateTime<Utc>,
+        cooldown_secs: Option<i32>,
+    ) -> Result<(), AuthRepoError> {
+        let row: UpsertRow = sqlx::query_as(
+            r#"
+            SELECT status, challenge_id, seconds_remaining
+            FROM create_or_refresh_auth_challenge($1, $2, $3::citext, $4, $5::jsonb, $6, $7)"#,
+        )
+        .bind(user_id)
+        .bind(action)
+        .bind(target)
+        .bind(code_hash)
+        .bind(meta)
+        .bind(expires_at)
+        .bind(cooldown_secs.unwrap_or(60))
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Error upserting auth challenge: {:#?}", e);
+            e
+        })?;
+
+        match row.status {
+            UpsertStatus::Inserted | UpsertStatus::Updated => Ok(()),
+            UpsertStatus::Cooldown => {
+                tracing::debug!(
+                    "Cooldown active for user {} , seconds remaining: {}",
+                    user_id,
+                    row.seconds_remaining
+                );
+                Err(AuthRepoError::Cooldown(row.seconds_remaining))
+            }
+        }
+    }
+
+    async fn get_auth_challenge(
+        &self,
+        user_id: Uuid,
+        action: AuthenticationAction,
+    ) -> Result<Option<AuthenticationChallenge>, AuthRepoError> {
+        let row = sqlx::query(
+            r#"
+                SELECT * FROM authentication_challenges
+                WHERE user_id = $1 AND action = $2 AND confirmed_at IS NULL
+            "#,
+        )
+        .bind(user_id)
+        .bind(action)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Error upserting auth challenge: {:#?}", e);
+            e
+        })?;
+
+        Ok(row.map(|row| AuthenticationChallenge {
+            id: row.get("id"),
+            user_id: row.get("user_id"),
+            action: row.get("action"),
+            target: row.get("target"),
+            code_hash: row.get("code_hash"),
+            meta: row.get("meta"),
+            expires_at: row.get("expires_at"),
+            created_at: row.get("created_at"),
+            confirmed_at: row.get("confirmed_at"),
+            attempts: row.get::<i32, _>("attempts") as u8,
+        }))
+    }
+
+    async fn confirm_authentication_challenge(
+        &self,
+        user_id: Uuid,
+        action: AuthenticationAction,
+        confirmed_at: DateTime<Utc>,
+    ) -> Result<(), AuthRepoError> {
+        sqlx::query("SELECT confirm_auth_challenge($1, $2, $3)")
+            .bind(user_id)
+            .bind(action)
+            .bind(confirmed_at)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Error upserting auth challenge: {:#?}", e);
+                e
+            })?;
+
+        Ok(())
+    }
+
+    async fn increase_auth_challenge_attempts(
+        &self,
+        challenge_id: i64,
+    ) -> Result<(), AuthRepoError> {
+        sqlx::query(
+            r#"
+            UPDATE authentication_challenges
+            SET attempts = attempts + 1
+            WHERE id = $1 AND confirmed_at IS NULL
+            "#,
+        )
+        .bind(challenge_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Error upserting auth challenge: {:#?}", e);
+            e
+        })?;
+
+        Ok(())
+    }
+}
+
+impl From<sqlx::Error> for AuthRepoError {
+    fn from(err: sqlx::Error) -> Self {
+        use sqlx::Error::*;
+        match &err {
+            Database(db) if matches!(db.code().as_deref(), Some("40001" | "55P03" | "57014")) => {
+                AuthRepoError::Transient
+            }
+            PoolTimedOut | Io(_) | Tls(_) | PoolClosed => AuthRepoError::Transient,
+
+            RowNotFound => AuthRepoError::NotFound,
+
+            _ => AuthRepoError::Internal,
+        }
     }
 }

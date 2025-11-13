@@ -18,11 +18,6 @@ pub struct ChangeEmailReq {
 }
 
 #[derive(Deserialize)]
-pub struct ConfirmEmailChangeReq {
-    pub code: String,
-}
-
-#[derive(Deserialize)]
 pub struct ChangePasswordReq {
     pub old_password: String,
     pub new_password: String,

@@ -72,7 +72,7 @@
 //! Environment variables can override any setting using the `APP_` prefix.
 
 // Module declarations
-pub mod app;
+// pub mod app;
 pub mod configuration;
 pub mod core;
 pub mod database;
