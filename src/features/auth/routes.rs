@@ -18,5 +18,6 @@ pub fn router() -> Router<AppState> {
         .route("/verify-email/confirm", post(c::email_verification_confirm))
         .route("/password-reset/request", post(c::pw_reset_request))
         .route("/password-reset/confirm", post(c::pw_reset_confirm))
-    // .route("/change-email/request", post(c::change_email_request))
+        .route("/change-email/request", post(c::change_email_request))
+        .route("/change-email/confirm", post(c::change_email_confirm))
 }

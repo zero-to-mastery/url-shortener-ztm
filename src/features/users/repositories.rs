@@ -26,6 +26,8 @@ pub trait UserRepository: Send + Sync {
     async fn find_user_by_email(&self, email: &str) -> anyhow::Result<Option<User>>;
     async fn find_user_by_id(&self, id: Uuid) -> anyhow::Result<Option<User>>;
     async fn email_exists(&self, email: &str) -> anyhow::Result<bool>;
+    async fn get_password_hash_by_id(&self, id: Uuid) -> anyhow::Result<Vec<u8>>;
+
     async fn confirm_email(&self, id: Uuid) -> anyhow::Result<()>;
 
     async fn set_last_login(&self, id: Uuid, at: DateTime<Utc>) -> anyhow::Result<()>;
@@ -33,7 +35,7 @@ pub trait UserRepository: Send + Sync {
     async fn bump_jwt_version(&self, id: Uuid) -> anyhow::Result<()>;
 
     async fn update_password(&self, id: Uuid, new_hash: &[u8]) -> anyhow::Result<()>;
-    async fn get_password_hash_by_id(&self, id: Uuid) -> anyhow::Result<Vec<u8>>;
+    async fn update_email(&self, id: Uuid, new_email: &str) -> anyhow::Result<()>;
 }
 
 // A no-operation implementation of UserRepository for testing purposes.
@@ -64,6 +66,9 @@ impl UserRepository for NoopUserRepo {
         Ok(())
     }
     async fn update_password(&self, _id: Uuid, _new: &[u8]) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn update_email(&self, _id: Uuid, _new_email: &str) -> anyhow::Result<()> {
         Ok(())
     }
     async fn get_password_hash_by_id(&self, _id: Uuid) -> anyhow::Result<Vec<u8>> {

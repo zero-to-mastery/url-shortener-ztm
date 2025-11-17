@@ -142,4 +142,13 @@ impl UserRepository for PgUserRepository {
             .await?;
         Ok(())
     }
+
+    async fn update_email(&self, id: Uuid, new_email: &str) -> anyhow::Result<()> {
+        sqlx::query("UPDATE users SET email = $1 WHERE id = $2")
+            .bind(new_email)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
 }

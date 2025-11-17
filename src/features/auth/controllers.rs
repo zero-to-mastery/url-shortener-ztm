@@ -148,7 +148,13 @@ pub async fn email_verification_request(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     ctrl.auth_svc
-        .send_verification_code(user.user_id, &usr.email, AuthenticationAction::VerifyEmail)
+        .send_verification_code(
+            user.user_id,
+            &usr.email,
+            None,
+            AuthenticationAction::VerifyEmail,
+            None,
+        )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -173,6 +179,33 @@ pub async fn email_verification_confirm(
     Ok(ApiResponse::success(()))
 }
 
+pub async fn change_email_request(
+    State(ctrl): State<AuthController>,
+    Extension(meta): Extension<ClientMeta>,
+    user: AuthenticatedUser,
+    Json(req): Json<ChangeEmailRequestReq>,
+) -> Result<ApiResponse<()>, ApiError> {
+    ctrl.auth_svc
+        .request_email_change(user.user_id, &req.new_email, &req.current_password, meta)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(ApiResponse::success(()))
+}
+
+pub async fn change_email_confirm(
+    State(ctrl): State<AuthController>,
+    user: AuthenticatedUser,
+    Json(req): Json<ChangeEmailConfirmReq>,
+) -> Result<ApiResponse<()>, ApiError> {
+    ctrl.auth_svc
+        .confirm_email_change(user.user_id, &req.code)
+        .await
+        .map_err(|e| ApiError::Unprocessable(e.to_string()))?;
+
+    Ok(ApiResponse::success(()))
+}
+
 pub async fn pw_reset_request(
     State(ctrl): State<AuthController>,
     Json(req): Json<PwResetRequestReq>,
@@ -184,7 +217,13 @@ pub async fn pw_reset_request(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     ctrl.auth_svc
-        .send_verification_code(usr.id, &usr.email, AuthenticationAction::ResetPassword)
+        .send_verification_code(
+            usr.id,
+            &usr.email,
+            None,
+            AuthenticationAction::ResetPassword,
+            None,
+        )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
