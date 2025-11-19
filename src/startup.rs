@@ -66,6 +66,7 @@ use crate::routes::{
     get_user_profile, get_users, health_check, post_shorten, serve_openapi_spec, serve_swagger_ui,
 };
 use axum::middleware::from_fn;
+use secrecy::ExposeSecret;
 use tokio::time::Duration as TokioDuration;
 
 use crate::shortcode::bloom_filter::{
@@ -251,7 +252,7 @@ impl Application {
         let allowed_chars = build_allowed_chars(cfg.shortener.alphabet.as_deref());
 
         let blooms: crate::shortcode::bloom_filter::BloomState = build_bloom_state(&url_db).await?;
-        let jwt = JwtKeys::new(cfg.application.api_key.as_bytes());
+        let jwt = JwtKeys::new(cfg.application.jwt_secret_b64.expose_secret().as_bytes());
 
         let (auth_svc, user_svc) = build_services(&cfg, &jwt).await?;
 
@@ -618,8 +619,9 @@ pub async fn build_services(
     let email_service = EmailService::new(
         cfg.application
             .email_svc_api_key
-            .as_deref()
-            .unwrap_or_default(),
+            .as_ref()
+            .map(|s| s.expose_secret())
+            .unwrap_or(""),
         cfg.application
             .email_svc_address
             .as_deref()
@@ -635,7 +637,7 @@ pub async fn build_services(
                 repos.auth.clone(),
                 jwt.clone(),
                 chrono::Duration::minutes(15),
-                cfg.application.api_key.to_string(),
+                cfg.application.pwd_pepper_b64.clone(),
                 email_service,
             )),
             Arc::new(UserService::new(repos.users.clone())),
@@ -647,7 +649,7 @@ pub async fn build_services(
                 Arc::new(NoopAuthRepo),
                 jwt.clone(),
                 chrono::Duration::minutes(15),
-                cfg.application.api_key.to_string(),
+                cfg.application.pwd_pepper_b64.clone(),
                 email_service,
             )),
             Arc::new(UserService::new(Arc::new(NoopUserRepo))),

@@ -3,8 +3,8 @@ use crate::{
     core::security::{
         jwt::{Claims, JwtKeys, gen_refresh_token, hash_refresh_token},
         password::{
-            generate_verification_code, hash_password, hash_verification_code, verify_password,
-            verify_verification_code,
+            NormalizedPassword, generate_verification_code, hash_password, hash_verification_code,
+            validate_policy, verify_password, verify_verification_code,
         },
     },
     features::{
@@ -20,6 +20,7 @@ use crate::{
 };
 use chrono::{Duration, Utc};
 use email_address::EmailAddress;
+use secrecy::{ExposeSecret, SecretString};
 use serde_json::json;
 use std::{net::IpAddr, sync::Arc};
 use uuid::Uuid;
@@ -34,7 +35,7 @@ pub struct AuthService {
     auth_repo: Arc<dyn AuthRepository>,
     jwt: JwtKeys,
     access_ttl: Duration,
-    pub_key: String,
+    pwd_pepper: SecretString,
     email_service: EmailService,
 }
 
@@ -44,7 +45,7 @@ impl AuthService {
         auth_repo: Arc<dyn AuthRepository>,
         jwt: JwtKeys,
         access_ttl: Duration,
-        pub_key: String,
+        pwd_pepper: SecretString,
         email_service: EmailService,
     ) -> Self {
         Self {
@@ -52,7 +53,7 @@ impl AuthService {
             auth_repo,
             jwt,
             access_ttl,
-            pub_key,
+            pwd_pepper,
             email_service,
         }
     }
@@ -69,14 +70,16 @@ impl AuthService {
         {
             return Err(anyhow::anyhow!("name too long"));
         }
+        let norm_pwd = NormalizedPassword::try_from(&req.password)?;
 
-        let pw_hash = hash_password(&req.password, &self.pub_key)?;
+        validate_policy(&norm_pwd)?;
+        let pw_hash = hash_password(&norm_pwd, self.pwd_pepper.expose_secret())?;
         let usr = self
             .users_repo
             .create(&req.email, &pw_hash, req.display_name)
             .await?;
         let code = generate_verification_code();
-        let code_hash = hash_verification_code(&code, &self.pub_key)?;
+        let code_hash = hash_verification_code(&code, self.pwd_pepper.expose_secret())?;
 
         self.auth_repo
             .create_or_refresh_auth_challenge(
@@ -125,7 +128,7 @@ impl AuthService {
         if !verify_password(
             &req.password,
             usr.password_hash.as_deref().unwrap(),
-            &self.pub_key,
+            self.pwd_pepper.expose_secret(),
         )? {
             return Err(anyhow::anyhow!("invalid credentials"));
         }
@@ -161,7 +164,7 @@ impl AuthService {
         &self,
         user_id: Uuid,
         new_email: &str,
-        current_pwd: &str,
+        current_pwd: &SecretString,
         meta: ClientMeta,
     ) -> anyhow::Result<()> {
         self.verify_password(user_id, current_pwd).await?;
@@ -236,7 +239,7 @@ impl AuthService {
         refresh_token: &str,
         device_id: &str,
     ) -> anyhow::Result<AuthBundle> {
-        let rt_hash = hash_refresh_token(refresh_token, &self.pub_key)?;
+        let rt_hash = hash_refresh_token(refresh_token, self.pwd_pepper.expose_secret())?;
 
         let Some(dev) = self
             .auth_repo
@@ -285,7 +288,7 @@ impl AuthService {
             .sign(user.id, user.jwt_token_version, self.access_ttl)?;
 
         let new_rt = gen_refresh_token();
-        let new_hash = hash_refresh_token(&new_rt, &self.pub_key)?;
+        let new_hash = hash_refresh_token(&new_rt, self.pwd_pepper.expose_secret())?;
 
         self.auth_repo
             .rotate_refresh_hash(dev.id, &new_hash, Utc::now())
@@ -300,16 +303,22 @@ impl AuthService {
     pub async fn change_password(
         &self,
         user_id: Uuid,
-        old_pwd: &str,
-        new_pwd: &str,
+        old_pwd: &SecretString,
+        new_pwd: &SecretString,
     ) -> anyhow::Result<()> {
         self.verify_password(user_id, old_pwd).await?;
 
         self.reset_password(user_id, new_pwd).await
     }
 
-    pub async fn reset_password(&self, user_id: Uuid, new_pwd: &str) -> anyhow::Result<()> {
-        let new_hash = hash_password(new_pwd, &self.pub_key)?;
+    pub async fn reset_password(
+        &self,
+        user_id: Uuid,
+        new_pwd: &SecretString,
+    ) -> anyhow::Result<()> {
+        let norm_pwd = NormalizedPassword::try_from(new_pwd)?;
+        validate_policy(&norm_pwd)?;
+        let new_hash = hash_password(&norm_pwd, self.pwd_pepper.expose_secret())?;
         self.users_repo.update_password(user_id, &new_hash).await?;
 
         self.sign_out_all(user_id).await
@@ -324,7 +333,7 @@ impl AuthService {
         meta: Option<&serde_json::Value>,
     ) -> anyhow::Result<()> {
         let code = generate_verification_code();
-        let code_hash = hash_verification_code(&code, &self.pub_key)?;
+        let code_hash = hash_verification_code(&code, self.pwd_pepper.expose_secret())?;
 
         self.auth_repo
             .create_or_refresh_auth_challenge(
@@ -380,7 +389,7 @@ impl AuthService {
             return Err(anyhow::anyhow!("challenge expired"));
         }
 
-        if !verify_verification_code(code, &challenge.code_hash, &self.pub_key)? {
+        if !verify_verification_code(code, &challenge.code_hash, self.pwd_pepper.expose_secret())? {
             self.auth_repo
                 .increase_auth_challenge_attempts(challenge.id)
                 .await?;
@@ -394,10 +403,10 @@ impl AuthService {
         Ok(challenge)
     }
 
-    pub async fn verify_password(&self, uuid: Uuid, password: &str) -> anyhow::Result<()> {
+    pub async fn verify_password(&self, uuid: Uuid, password: &SecretString) -> anyhow::Result<()> {
         let stored = self.users_repo.get_password_hash_by_id(uuid).await?;
 
-        if !verify_password(password, &stored, &self.pub_key)? {
+        if !verify_password(password, &stored, self.pwd_pepper.expose_secret())? {
             return Err(anyhow::anyhow!("invalid password"));
         }
 
@@ -433,7 +442,7 @@ impl AuthService {
         let access_token = self.jwt.sign(user_id, ver, self.access_ttl)?;
 
         let refresh_token = gen_refresh_token();
-        let refresh_hash = hash_refresh_token(&refresh_token, &self.pub_key)?;
+        let refresh_hash = hash_refresh_token(&refresh_token, self.pwd_pepper.expose_secret())?;
         let absolute_expires = Utc::now() + Duration::days(REFRESH_TTL_DAYS);
 
         let _ = self

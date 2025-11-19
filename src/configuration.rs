@@ -41,6 +41,7 @@ use figment::{
     Figment,
     providers::{Env, Format, Yaml},
 };
+use secrecy::SecretString;
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use std::fmt;
@@ -105,14 +106,14 @@ pub struct ApplicationSettings {
     /// UUID-based API key for authenticating requests to protected endpoints
     pub api_key: Uuid,
     /// API key for the email service
-    pub email_svc_api_key: Option<String>,
+    pub email_svc_api_key: Option<SecretString>,
     /// From address for sending emails
     pub email_svc_address: Option<String>,
     /// Directory path containing Tera template files
     pub templates: String,
 
-    pub jwt_secret_b64: String,
-    pub pwd_pepper_b64: String,
+    pub jwt_secret_b64: SecretString,
+    pub pwd_pepper_b64: SecretString,
 }
 
 /// Supported database types.

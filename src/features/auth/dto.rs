@@ -1,9 +1,10 @@
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct SignUpReq {
     pub email: String,
-    pub password: String,
+    pub password: SecretString,
     pub display_name: Option<String>,
     pub device_id: Option<String>,
 }
@@ -11,7 +12,7 @@ pub struct SignUpReq {
 #[derive(Deserialize)]
 pub struct SignInReq {
     pub email: String,
-    pub password: String,
+    pub password: SecretString,
     pub device_id: Option<String>,
 }
 
@@ -45,13 +46,13 @@ pub struct PwResetRequestReq {
 pub struct PwResetConfirmReq {
     pub email: String,
     pub code: String,
-    pub new_password: String,
+    pub new_password: SecretString,
 }
 
 #[derive(Deserialize)]
 pub struct ChangePasswordReq {
-    pub old_password: String,
-    pub new_password: String,
+    pub old_password: SecretString,
+    pub new_password: SecretString,
 }
 
 #[derive(Deserialize)]
@@ -61,7 +62,7 @@ pub struct EmailVerificationConfirmReq {
 
 #[derive(Deserialize)]
 pub struct ChangeEmailRequestReq {
-    pub current_password: String,
+    pub current_password: SecretString,
     pub new_email: String,
 }
 
