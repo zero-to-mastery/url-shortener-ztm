@@ -299,6 +299,106 @@ impl AuthRepository for PgAuthRepository {
 
         Ok(())
     }
+
+    async fn add_sign_in_attempt(
+        &self,
+        user_id: &Uuid,
+        ip: IpAddr,
+        target: &str,
+        success: bool,
+        user_agent: Option<&str>,
+    ) -> Result<(), AuthRepoError> {
+        sqlx::query(
+            r#"
+            INSERT INTO sign_in_attempts (user_id, ip, target, success, user_agent)
+            VALUES ($1, $2, $3, $4, $5)
+            "#,
+        )
+        .bind(user_id)
+        .bind(ip)
+        .bind(target)
+        .bind(success)
+        .bind(user_agent)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Error adding sign in attempt: {:#?}", e);
+            e
+        })?;
+
+        Ok(())
+    }
+
+    async fn is_user_ip_blocked(
+        &self,
+        user_id: &Uuid,
+        ip: IpAddr,
+        threshold: i32,
+        window_mins: i32,
+        fail_count_since: Option<DateTime<Utc>>,
+    ) -> Result<bool, AuthRepoError> {
+        let blocked = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM sign_in_attempts
+                WHERE user_id = $1
+                  AND ip = $2
+                  AND success = false
+                  AND created_at > GREATEST(
+                        now() - make_interval(mins => $3),
+                        COALESCE($4, '-infinity'::timestamptz)
+                  )
+                ORDER BY created_at DESC
+                OFFSET GREATEST($5 - 1, 0)
+                LIMIT 1
+            )
+            "#,
+        )
+        .bind(user_id)
+        .bind(ip)
+        .bind(window_mins)
+        .bind(fail_count_since)
+        .bind(threshold)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(blocked)
+    }
+
+    async fn should_lock_user_for_failures(
+        &self,
+        user_id: &Uuid,
+        threshold: i32,
+        window_mins: i32,
+        fail_count_since: Option<DateTime<Utc>>,
+    ) -> Result<bool, AuthRepoError> {
+        let should_lock = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM sign_in_attempts
+                WHERE user_id = $1
+                  AND success = false
+                  AND created_at > GREATEST(
+                        now() - make_interval(mins => $2),
+                        COALESCE($3, '-infinity'::timestamptz)
+                  )
+                ORDER BY created_at DESC
+                OFFSET GREATEST($4 - 1, 0)
+                LIMIT 1
+            )
+            "#,
+        )
+        .bind(user_id) // $1
+        .bind(window_mins) // $2
+        .bind(fail_count_since) // $3
+        .bind(threshold) // $4
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(should_lock)
+    }
 }
 
 impl From<sqlx::Error> for AuthRepoError {

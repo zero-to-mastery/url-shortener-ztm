@@ -62,9 +62,9 @@ pub async fn sign_in(
 ) -> Result<impl IntoResponse, ApiError> {
     let bundle = ctrl
         .auth_svc
-        .sign_in(req, meta.ip)
+        .sign_in(req, meta)
         .await
-        .map_err(|_| ApiError::Unauthorized("invalid credentials".into()))?;
+        .map_err(|e| ApiError::Unauthorized(e.to_string()))?;
 
     let at = make_access_cookie(bundle.access_token, 30);
     let rt = make_refresh_cookie(bundle.refresh_token, 30);

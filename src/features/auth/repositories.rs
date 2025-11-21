@@ -114,6 +114,32 @@ pub trait AuthRepository: Send + Sync {
     async fn revoke_device(&self, id: i32) -> anyhow::Result<()>;
     async fn revoke_all(&self, user_id: Uuid) -> anyhow::Result<()>;
 
+    async fn is_user_ip_blocked(
+        &self,
+        user_id: &Uuid,
+        ip: IpAddr,
+        threshold: i32,
+        window_mins: i32,
+        fail_count_since: Option<DateTime<Utc>>,
+    ) -> Result<bool, AuthRepoError>;
+
+    async fn should_lock_user_for_failures(
+        &self,
+        user_id: &Uuid,
+        threshold: i32,
+        window_mins: i32,
+        fail_count_since: Option<DateTime<Utc>>,
+    ) -> Result<bool, AuthRepoError>;
+
+    async fn add_sign_in_attempt(
+        &self,
+        user_id: &Uuid,
+        ip: IpAddr,
+        target: &str,
+        success: bool,
+        user_agent: Option<&str>,
+    ) -> Result<(), AuthRepoError>;
+
     #[allow(clippy::too_many_arguments)]
     async fn create_or_refresh_auth_challenge(
         &self,
@@ -227,6 +253,37 @@ impl AuthRepository for NoopAuthRepo {
         _user_id: Uuid,
         _action: AuthenticationAction,
         _confirmed_at: DateTime<Utc>,
+    ) -> Result<(), AuthRepoError> {
+        Ok(())
+    }
+    async fn is_user_ip_blocked(
+        &self,
+        _user_id: &Uuid,
+        _ip: IpAddr,
+        _ip_max: i32,
+        _window_mins: i32,
+        _fail_count_since: Option<DateTime<Utc>>,
+    ) -> Result<bool, AuthRepoError> {
+        Ok(false)
+    }
+
+    async fn should_lock_user_for_failures(
+        &self,
+        _user_id: &Uuid,
+        _threshold: i32,
+        _window_mins: i32,
+        _fail_count_since: Option<DateTime<Utc>>,
+    ) -> Result<bool, AuthRepoError> {
+        Ok(false)
+    }
+
+    async fn add_sign_in_attempt(
+        &self,
+        _user_id: &Uuid,
+        _ip: IpAddr,
+        _target: &str,
+        _success: bool,
+        _user_agent: Option<&str>,
     ) -> Result<(), AuthRepoError> {
         Ok(())
     }

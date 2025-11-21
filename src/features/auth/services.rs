@@ -30,6 +30,12 @@ const REFRESH_TTL_DAYS: i64 = 30;
 const MAX_ATTEMPTS_ALLOWED: u8 = 5;
 const DEFAULT_DEVICE_ID: &str = "default";
 
+const MAX_SIGNIN_ATTEMPTS_PER_IP: i32 = 5;
+const MAX_SIGNIN_ATTEMPTS_PER_USER: i32 = 12;
+const MAX_IP_SIGNIN_ATTEMPT_WINDOW_MINS: i32 = 5;
+const MAX_USER_SIGNIN_ATTEMPT_WINDOW_MINS: i32 = 30;
+const ACCOUNT_LOCK_HOURS: i64 = 6;
+
 pub struct AuthService {
     users_repo: Arc<dyn UserRepository>,
     auth_repo: Arc<dyn AuthRepository>,
@@ -59,9 +65,10 @@ impl AuthService {
     }
 
     pub async fn sign_up(&self, req: SignUpReq, ip: Option<IpAddr>) -> anyhow::Result<AuthBundle> {
-        if !EmailAddress::is_valid(&req.email) {
+        let email = req.email.trim();
+        if !EmailAddress::is_valid(email) {
             return Err(anyhow::anyhow!("invalid email"));
-        } else if self.users_repo.email_exists(&req.email).await? {
+        } else if self.users_repo.email_exists(email).await? {
             return Err(anyhow::anyhow!("email already registered"));
         }
 
@@ -76,7 +83,7 @@ impl AuthService {
         let pw_hash = hash_password(&norm_pwd, self.pwd_pepper.expose_secret())?;
         let usr = self
             .users_repo
-            .create(&req.email, &pw_hash, req.display_name)
+            .create(email, &pw_hash, req.display_name)
             .await?;
         let code = generate_verification_code();
         let code_hash = hash_verification_code(&code, self.pwd_pepper.expose_secret())?;
@@ -100,13 +107,13 @@ impl AuthService {
             None,
             ip,
         );
-        let email_fut = async move {
+        let email_fut = async {
             if let Err(err) = self
                 .email_service
-                .send_verification_code(&req.email, &code)
+                .send_verification_code(email, &code)
                 .await
             {
-                tracing::warn!(email=%req.email, error=%err, "send verification code failed");
+                tracing::warn!(email=email, error=%err, "send verification code failed");
             }
         };
 
@@ -114,33 +121,77 @@ impl AuthService {
         bundle
     }
 
-    pub async fn sign_in(&self, req: SignInReq, ip: Option<IpAddr>) -> anyhow::Result<AuthBundle> {
-        if !EmailAddress::is_valid(&req.email) {
-            return Err(anyhow::anyhow!("invalid email"));
+    pub async fn sign_in(&self, req: SignInReq, meta: ClientMeta) -> anyhow::Result<AuthBundle> {
+        let usr_email = req.email.trim();
+        if !EmailAddress::is_valid(usr_email) {
+            return Err(anyhow::anyhow!("Invalid email address"));
         }
 
-        let usr = self
-            .users_repo
-            .find_user_by_email(&req.email)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("email not found"))?;
+        let user_opt = self.users_repo.find_user_by_email(usr_email).await?;
+        let usr = match user_opt {
+            Some(u) => u,
+            None => anyhow::bail!("wrong email or password"),
+        };
 
-        if !verify_password(
-            &req.password,
-            usr.password_hash.as_deref().unwrap(),
-            self.pwd_pepper.expose_secret(),
-        )? {
-            return Err(anyhow::anyhow!("invalid credentials"));
+        if let Some(locked_until) = usr.locked_until
+            && locked_until > Utc::now()
+        {
+            anyhow::bail!("account locked");
         }
 
-        self.issue_bundle(
+        let ip = meta.ip.unwrap_or_else(|| "0.0.0.0".parse().unwrap());
+        let ip_blocked = self
+            .auth_repo
+            .is_user_ip_blocked(
+                &usr.id,
+                ip,
+                MAX_SIGNIN_ATTEMPTS_PER_IP,
+                MAX_IP_SIGNIN_ATTEMPT_WINDOW_MINS,
+                usr.fail_count_since,
+            )
+            .await?;
+
+        if ip_blocked {
+            return Err(anyhow::anyhow!("too many sign-in attempts"));
+        }
+
+        self.authenticate_user(&usr, &req.password, ip, meta.user_agent.as_deref())
+            .await?;
+
+        let bundle_fut = self.issue_bundle(
             usr.id,
             usr.jwt_token_version,
             req.device_id.as_deref(),
             None,
-            ip,
-        )
-        .await
+            Some(ip),
+        );
+
+        let add_attempt_fut = {
+            let user_agent = meta.user_agent.clone();
+            async move {
+                if let Err(err) = self
+                    .auth_repo
+                    .add_sign_in_attempt(&usr.id, ip, usr_email, true, user_agent.as_deref())
+                    .await
+                {
+                    tracing::warn!(usr.id=%usr.id, error=%err, "failed to record sign in attempt");
+                }
+            }
+        };
+
+        let fail_count_fut = async move {
+            if let Err(err) = self
+                .users_repo
+                .update_fail_count_since(usr.id, Utc::now())
+                .await
+            {
+                tracing::warn!(usr.id=%usr.id, error=%err, "failed to update fail count");
+            }
+        };
+
+        let (bundle_res, _, _) = tokio::join!(bundle_fut, add_attempt_fut, fail_count_fut);
+
+        bundle_res
     }
 
     pub async fn sign_out(&self, user_id: Uuid, device_id: &str) -> anyhow::Result<()> {
@@ -168,7 +219,7 @@ impl AuthService {
         meta: ClientMeta,
     ) -> anyhow::Result<()> {
         self.verify_password(user_id, current_pwd).await?;
-
+        let new_email = new_email.trim();
         if !EmailAddress::is_valid(new_email) {
             return Err(anyhow::anyhow!("invalid email"));
         } else if self.users_repo.email_exists(new_email).await? {
@@ -454,6 +505,52 @@ impl AuthService {
             access_token,
             refresh_token,
         })
+    }
+
+    async fn authenticate_user(
+        &self,
+        usr: &crate::features::users::repositories::User,
+        password: &SecretString,
+        ip: IpAddr,
+        user_agent: Option<&str>,
+    ) -> anyhow::Result<()> {
+        match self.verify_password(usr.id, password).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.to_string().contains("invalid password") => {
+                self.handle_failed_signin(usr, ip, user_agent).await?;
+                anyhow::bail!("wrong email or password")
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    async fn handle_failed_signin(
+        &self,
+        usr: &crate::features::users::repositories::User,
+        ip: IpAddr,
+        user_agent: Option<&str>,
+    ) -> anyhow::Result<()> {
+        self.auth_repo
+            .add_sign_in_attempt(&usr.id, ip, &usr.email, false, user_agent)
+            .await?;
+
+        let should_lock = self
+            .auth_repo
+            .should_lock_user_for_failures(
+                &usr.id,
+                MAX_SIGNIN_ATTEMPTS_PER_USER,
+                MAX_USER_SIGNIN_ATTEMPT_WINDOW_MINS,
+                usr.fail_count_since,
+            )
+            .await?;
+
+        if should_lock {
+            let until = Utc::now() + Duration::hours(ACCOUNT_LOCK_HOURS);
+            self.users_repo.lock_user_until(usr.id, until).await?;
+            anyhow::bail!("account locked");
+        }
+
+        Ok(())
     }
 }
 

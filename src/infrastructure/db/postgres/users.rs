@@ -41,6 +41,8 @@ impl UserRepository for PgUserRepository {
             created_at: row.get("created_at"),
             last_login_at: row.get("last_login_at"),
             jwt_token_version: row.get::<i32, _>("jwt_token_version") as u32,
+            locked_until: None,
+            fail_count_since: None,
         })
     }
 
@@ -48,7 +50,7 @@ impl UserRepository for PgUserRepository {
         let row = sqlx::query(
             r#"
             SELECT id, email, password_hash, display_name, is_email_verified,
-                created_at, last_login_at, jwt_token_version
+                created_at, last_login_at, jwt_token_version, locked_until, fail_count_since
             FROM users WHERE email = $1
             "#,
         )
@@ -65,6 +67,8 @@ impl UserRepository for PgUserRepository {
             created_at: r.get("created_at"),
             last_login_at: r.get("last_login_at"),
             jwt_token_version: r.get::<i32, _>("jwt_token_version") as u32,
+            locked_until: r.get("locked_until"),
+            fail_count_since: r.get("fail_count_since"),
         }))
     }
 
@@ -89,7 +93,7 @@ impl UserRepository for PgUserRepository {
         let row = sqlx::query(
             r#"
             SELECT id, email, password_hash, display_name, is_email_verified,
-                created_at, last_login_at, jwt_token_version
+                created_at, last_login_at, jwt_token_version, locked_until, fail_count_since
             FROM users WHERE id = $1
             "#,
         )
@@ -106,6 +110,8 @@ impl UserRepository for PgUserRepository {
             created_at: r.get("created_at"),
             last_login_at: r.get("last_login_at"),
             jwt_token_version: r.get::<i32, _>("jwt_token_version") as u32,
+            locked_until: r.get("locked_until"),
+            fail_count_since: r.get("fail_count_since"),
         }))
     }
 
@@ -146,6 +152,24 @@ impl UserRepository for PgUserRepository {
     async fn update_email(&self, id: Uuid, new_email: &str) -> anyhow::Result<()> {
         sqlx::query("UPDATE users SET email = $1 WHERE id = $2")
             .bind(new_email)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn lock_user_until(&self, id: Uuid, until: DateTime<Utc>) -> anyhow::Result<()> {
+        sqlx::query("UPDATE users SET locked_until = $1 WHERE id = $2")
+            .bind(until)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn update_fail_count_since(&self, id: Uuid, since: DateTime<Utc>) -> anyhow::Result<()> {
+        sqlx::query("UPDATE users SET fail_count_since = $1 WHERE id = $2")
+            .bind(since)
             .bind(id)
             .execute(&self.pool)
             .await?;
