@@ -1,7 +1,7 @@
 @base = http://localhost:8000
 @device_id = some-unique-device-id
 @email = example@example.com
-@password = 012345678911
+@password = 安全パスワード!2024Strong
 
 ### Sign up
 POST {{base}}/api/v1/auth/sign-up
@@ -70,8 +70,8 @@ Content-Type: application/json
 
 {
   "email": "{{email}}",
-  "code": "ObKgdbnQ",
-  "new_password": "123456789012妮妮"
+  "code": "xxxxxxxx",
+  "new_password": "安全パスワード!2024Strong11"
 }
 
 ### Request email verification
@@ -82,8 +82,27 @@ POST {{base}}/api/v1/auth/verify-email/confirm
 Content-Type: application/json
 
 {
-  "code": "XFi2CCYK"
+  "code": "xxxxxxxx"
 }
+
+### Request Change email 
+POST {{base}}/api/v1/auth/change-email/request
+Content-Type: application/json
+
+{
+  "current_password": "012345678911",
+  "new_email": "wanikac200@gyknife.com"
+}
+
+### Confirm Change email 
+
+POST {{base}}/api/v1/auth/change-email/confirm
+Content-Type: application/json
+
+{
+  "code": "xxxxxxxx"
+}
+
 
 ### Get current user
 GET {{base}}/api/v1/user/me

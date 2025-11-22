@@ -1,16 +1,18 @@
 use crate::{
-    ApiError,
+    ApiError, ClientMeta,
     core::security::{
         jwt::{Claims, JwtKeys, gen_refresh_token, hash_refresh_token},
         password::{
-            generate_verification_code, hash_password, hash_verification_code, verify_password,
-            verify_verification_code,
+            NormalizedPassword, generate_verification_code, hash_password, hash_verification_code,
+            validate_policy, verify_password, verify_verification_code,
         },
     },
     features::{
         auth::{
             dto::{AuthBundle, SignInReq, SignUpReq},
-            repositories::{AuthRepoError, AuthRepository, AuthenticationAction},
+            repositories::{
+                AuthRepoError, AuthRepository, AuthenticationAction, AuthenticationChallenge,
+            },
         },
         users::repositories::UserRepository,
     },
@@ -18,21 +20,28 @@ use crate::{
 };
 use chrono::{Duration, Utc};
 use email_address::EmailAddress;
+use secrecy::{ExposeSecret, SecretString};
+use serde_json::json;
 use std::{net::IpAddr, sync::Arc};
 use uuid::Uuid;
-
 const MAX_USER_NAME_LENGTH: usize = 30;
 const GRACE_SECONDS: i64 = 120;
 const REFRESH_TTL_DAYS: i64 = 30;
 const MAX_ATTEMPTS_ALLOWED: u8 = 5;
 const DEFAULT_DEVICE_ID: &str = "default";
 
+const MAX_SIGNIN_ATTEMPTS_PER_IP: i32 = 5;
+const MAX_SIGNIN_ATTEMPTS_PER_USER: i32 = 12;
+const MAX_IP_SIGNIN_ATTEMPT_WINDOW_MINS: i32 = 5;
+const MAX_USER_SIGNIN_ATTEMPT_WINDOW_MINS: i32 = 30;
+const ACCOUNT_LOCK_HOURS: i64 = 6;
+
 pub struct AuthService {
     users_repo: Arc<dyn UserRepository>,
     auth_repo: Arc<dyn AuthRepository>,
     jwt: JwtKeys,
     access_ttl: Duration,
-    pub_key: String,
+    pwd_pepper: SecretString,
     email_service: EmailService,
 }
 
@@ -42,7 +51,7 @@ impl AuthService {
         auth_repo: Arc<dyn AuthRepository>,
         jwt: JwtKeys,
         access_ttl: Duration,
-        pub_key: String,
+        pwd_pepper: SecretString,
         email_service: EmailService,
     ) -> Self {
         Self {
@@ -50,15 +59,16 @@ impl AuthService {
             auth_repo,
             jwt,
             access_ttl,
-            pub_key,
+            pwd_pepper,
             email_service,
         }
     }
 
     pub async fn sign_up(&self, req: SignUpReq, ip: Option<IpAddr>) -> anyhow::Result<AuthBundle> {
-        if !EmailAddress::is_valid(&req.email) {
+        let email = req.email.trim();
+        if !EmailAddress::is_valid(email) {
             return Err(anyhow::anyhow!("invalid email"));
-        } else if self.users_repo.email_exists(&req.email).await? {
+        } else if self.users_repo.email_exists(email).await? {
             return Err(anyhow::anyhow!("email already registered"));
         }
 
@@ -67,14 +77,16 @@ impl AuthService {
         {
             return Err(anyhow::anyhow!("name too long"));
         }
+        let norm_pwd = NormalizedPassword::try_from(&req.password)?;
 
-        let pw_hash = hash_password(&req.password, &self.pub_key)?;
+        validate_policy(&norm_pwd)?;
+        let pw_hash = hash_password(&norm_pwd, self.pwd_pepper.expose_secret())?;
         let usr = self
             .users_repo
-            .create(&req.email, &pw_hash, req.display_name)
+            .create(email, &pw_hash, req.display_name)
             .await?;
         let code = generate_verification_code();
-        let code_hash = hash_verification_code(&code, &self.pub_key)?;
+        let code_hash = hash_verification_code(&code, self.pwd_pepper.expose_secret())?;
 
         self.auth_repo
             .create_or_refresh_auth_challenge(
@@ -95,13 +107,13 @@ impl AuthService {
             None,
             ip,
         );
-        let email_fut = async move {
+        let email_fut = async {
             if let Err(err) = self
                 .email_service
-                .send_verification_code(&req.email, &code)
+                .send_verification_code(email, &code)
                 .await
             {
-                tracing::warn!(email=%req.email, error=%err, "send verification code failed");
+                tracing::warn!(email=email, error=%err, "send verification code failed");
             }
         };
 
@@ -109,33 +121,77 @@ impl AuthService {
         bundle
     }
 
-    pub async fn sign_in(&self, req: SignInReq, ip: Option<IpAddr>) -> anyhow::Result<AuthBundle> {
-        if !EmailAddress::is_valid(&req.email) {
-            return Err(anyhow::anyhow!("invalid email"));
+    pub async fn sign_in(&self, req: SignInReq, meta: ClientMeta) -> anyhow::Result<AuthBundle> {
+        let usr_email = req.email.trim();
+        if !EmailAddress::is_valid(usr_email) {
+            return Err(anyhow::anyhow!("Invalid email address"));
         }
 
-        let usr = self
-            .users_repo
-            .find_user_by_email(&req.email)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("email not found"))?;
+        let user_opt = self.users_repo.find_user_by_email(usr_email).await?;
+        let usr = match user_opt {
+            Some(u) => u,
+            None => anyhow::bail!("wrong email or password"),
+        };
 
-        if !verify_password(
-            &req.password,
-            usr.password_hash.as_deref().unwrap(),
-            &self.pub_key,
-        )? {
-            return Err(anyhow::anyhow!("invalid credentials"));
+        if let Some(locked_until) = usr.locked_until
+            && locked_until > Utc::now()
+        {
+            anyhow::bail!("account locked");
         }
 
-        self.issue_bundle(
+        let ip = meta.ip.unwrap_or_else(|| "0.0.0.0".parse().unwrap());
+        let ip_blocked = self
+            .auth_repo
+            .is_user_ip_blocked(
+                &usr.id,
+                ip,
+                MAX_SIGNIN_ATTEMPTS_PER_IP,
+                MAX_IP_SIGNIN_ATTEMPT_WINDOW_MINS,
+                usr.fail_count_since,
+            )
+            .await?;
+
+        if ip_blocked {
+            return Err(anyhow::anyhow!("too many sign-in attempts"));
+        }
+
+        self.authenticate_user(&usr, &req.password, ip, meta.user_agent.as_deref())
+            .await?;
+
+        let bundle_fut = self.issue_bundle(
             usr.id,
             usr.jwt_token_version,
             req.device_id.as_deref(),
             None,
-            ip,
-        )
-        .await
+            Some(ip),
+        );
+
+        let add_attempt_fut = {
+            let user_agent = meta.user_agent.clone();
+            async move {
+                if let Err(err) = self
+                    .auth_repo
+                    .add_sign_in_attempt(&usr.id, ip, usr_email, true, user_agent.as_deref())
+                    .await
+                {
+                    tracing::warn!(usr.id=%usr.id, error=%err, "failed to record sign in attempt");
+                }
+            }
+        };
+
+        let fail_count_fut = async move {
+            if let Err(err) = self
+                .users_repo
+                .update_fail_count_since(usr.id, Utc::now())
+                .await
+            {
+                tracing::warn!(usr.id=%usr.id, error=%err, "failed to update fail count");
+            }
+        };
+
+        let (bundle_res, _, _) = tokio::join!(bundle_fut, add_attempt_fut, fail_count_fut);
+
+        bundle_res
     }
 
     pub async fn sign_out(&self, user_id: Uuid, device_id: &str) -> anyhow::Result<()> {
@@ -155,12 +211,86 @@ impl AuthService {
         Ok(())
     }
 
+    pub async fn request_email_change(
+        &self,
+        user_id: Uuid,
+        new_email: &str,
+        current_pwd: &SecretString,
+        meta: ClientMeta,
+    ) -> anyhow::Result<()> {
+        self.verify_password(user_id, current_pwd).await?;
+        let new_email = new_email.trim();
+        if !EmailAddress::is_valid(new_email) {
+            return Err(anyhow::anyhow!("invalid email"));
+        } else if self.users_repo.email_exists(new_email).await? {
+            return Err(anyhow::anyhow!("email already registered"));
+        }
+
+        let user = self
+            .users_repo
+            .find_user_by_id(user_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("user not found"))?;
+
+        let old_email = user.email.clone();
+        let new_email_owned = new_email.to_string();
+
+        let meta_payload = json!({
+            "old_email": user.email.clone(),
+            "new_email": new_email.to_string(),
+            "ip": meta.ip.map(|ip| ip.to_string()),
+            "user_agent": meta.user_agent.clone(),
+        });
+
+        let verification_fut = self.send_verification_code(
+            user_id,
+            &new_email_owned,
+            Some(&new_email_owned),
+            AuthenticationAction::ChangeEmail,
+            Some(&meta_payload),
+        );
+
+        let notification_fut = async {
+            let body = format!(
+                r#"<h2>Email Change Requested</h2>
+            <p>You have requested to change your email to <strong>{}</strong>.</p>
+            <p>If you did not make this request, please contact support immediately.</p>"#,
+                new_email_owned
+            );
+
+            if let Err(e) = self
+                .email_service
+                .send_email(&old_email, "Email Change Requested", &body)
+                .await
+            {
+                tracing::warn!(email=%old_email, error=%e, "failed to send notification email");
+            }
+        };
+
+        let (result, _) = tokio::join!(verification_fut, notification_fut);
+        result
+    }
+
+    pub async fn confirm_email_change(&self, user_id: Uuid, code: &str) -> anyhow::Result<()> {
+        let challenge = self
+            .verify_code(user_id, AuthenticationAction::ChangeEmail, code)
+            .await?;
+
+        if let Some(target_email) = challenge.target {
+            self.users_repo.update_email(user_id, &target_email).await?;
+        } else {
+            return Err(anyhow::anyhow!("no target email in challenge"));
+        }
+
+        Ok(())
+    }
+
     pub async fn refresh(
         &self,
         refresh_token: &str,
         device_id: &str,
     ) -> anyhow::Result<AuthBundle> {
-        let rt_hash = hash_refresh_token(refresh_token, &self.pub_key)?;
+        let rt_hash = hash_refresh_token(refresh_token, self.pwd_pepper.expose_secret())?;
 
         let Some(dev) = self
             .auth_repo
@@ -209,7 +339,7 @@ impl AuthService {
             .sign(user.id, user.jwt_token_version, self.access_ttl)?;
 
         let new_rt = gen_refresh_token();
-        let new_hash = hash_refresh_token(&new_rt, &self.pub_key)?;
+        let new_hash = hash_refresh_token(&new_rt, self.pwd_pepper.expose_secret())?;
 
         self.auth_repo
             .rotate_refresh_hash(dev.id, &new_hash, Utc::now())
@@ -224,23 +354,114 @@ impl AuthService {
     pub async fn change_password(
         &self,
         user_id: Uuid,
-        old_pwd: &str,
-        new_pwd: &str,
+        old_pwd: &SecretString,
+        new_pwd: &SecretString,
     ) -> anyhow::Result<()> {
-        let stored = self.users_repo.get_password_hash_by_id(user_id).await?;
-
-        if !verify_password(old_pwd, &stored, &self.pub_key)? {
-            return Err(anyhow::anyhow!("invalid old password"));
-        }
+        self.verify_password(user_id, old_pwd).await?;
 
         self.reset_password(user_id, new_pwd).await
     }
 
-    pub async fn reset_password(&self, user_id: Uuid, new_pwd: &str) -> anyhow::Result<()> {
-        let new_hash = hash_password(new_pwd, &self.pub_key)?;
+    pub async fn reset_password(
+        &self,
+        user_id: Uuid,
+        new_pwd: &SecretString,
+    ) -> anyhow::Result<()> {
+        let norm_pwd = NormalizedPassword::try_from(new_pwd)?;
+        validate_policy(&norm_pwd)?;
+        let new_hash = hash_password(&norm_pwd, self.pwd_pepper.expose_secret())?;
         self.users_repo.update_password(user_id, &new_hash).await?;
 
         self.sign_out_all(user_id).await
+    }
+
+    pub async fn send_verification_code(
+        &self,
+        user_id: Uuid,
+        email: &str,
+        target: Option<&str>,
+        action: AuthenticationAction,
+        meta: Option<&serde_json::Value>,
+    ) -> anyhow::Result<()> {
+        let code = generate_verification_code();
+        let code_hash = hash_verification_code(&code, self.pwd_pepper.expose_secret())?;
+
+        self.auth_repo
+            .create_or_refresh_auth_challenge(
+                user_id,
+                action.clone(),
+                target,
+                &code_hash,
+                meta,
+                Utc::now() + Duration::hours(1),
+                None,
+            )
+            .await?;
+
+        match action {
+            AuthenticationAction::VerifyEmail | AuthenticationAction::ChangeEmail => {
+                self.email_service
+                    .send_verification_code(email, &code)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("failed to send email: {}", e))?;
+            }
+            AuthenticationAction::ResetPassword => {
+                self.email_service
+                    .send_password_reset_code(email, &code)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("failed to send email: {}", e))?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn verify_code(
+        &self,
+        user_id: Uuid,
+        action: AuthenticationAction,
+        code: &str,
+    ) -> anyhow::Result<AuthenticationChallenge> {
+        let Some(challenge) = self
+            .auth_repo
+            .get_auth_challenge(user_id, action.clone())
+            .await?
+        else {
+            return Err(anyhow::anyhow!("challenge not found"));
+        };
+
+        if challenge.attempts >= MAX_ATTEMPTS_ALLOWED {
+            return Err(anyhow::anyhow!(
+                "too many attempts, please request a new code"
+            ));
+        }
+
+        if Utc::now() > challenge.expires_at {
+            return Err(anyhow::anyhow!("challenge expired"));
+        }
+
+        if !verify_verification_code(code, &challenge.code_hash, self.pwd_pepper.expose_secret())? {
+            self.auth_repo
+                .increase_auth_challenge_attempts(challenge.id)
+                .await?;
+            return Err(anyhow::anyhow!("invalid code"));
+        }
+
+        self.auth_repo
+            .confirm_authentication_challenge(user_id, action, Utc::now())
+            .await?;
+
+        Ok(challenge)
+    }
+
+    pub async fn verify_password(&self, uuid: Uuid, password: &SecretString) -> anyhow::Result<()> {
+        let stored = self.users_repo.get_password_hash_by_id(uuid).await?;
+
+        if !verify_password(password, &stored, self.pwd_pepper.expose_secret())? {
+            return Err(anyhow::anyhow!("invalid password"));
+        }
+
+        Ok(())
     }
 
     pub async fn verify_token(&self, token: &str) -> anyhow::Result<Claims> {
@@ -260,84 +481,6 @@ impl AuthService {
         Ok(claims)
     }
 
-    pub async fn send_verification_code(
-        &self,
-        user_id: Uuid,
-        email: &str,
-        action: AuthenticationAction,
-    ) -> anyhow::Result<()> {
-        let code = generate_verification_code();
-        let code_hash = hash_verification_code(&code, &self.pub_key)?;
-
-        self.auth_repo
-            .create_or_refresh_auth_challenge(
-                user_id,
-                action.clone(),
-                None,
-                &code_hash,
-                None,
-                Utc::now() + Duration::hours(1),
-                None,
-            )
-            .await?;
-
-        match action {
-            AuthenticationAction::VerifyEmail => {
-                self.email_service
-                    .send_verification_code(email, &code)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("failed to send email: {}", e))?;
-            }
-            AuthenticationAction::ResetPassword => {
-                self.email_service
-                    .send_password_reset_code(email, &code)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("failed to send email: {}", e))?;
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    pub async fn verify_code(
-        &self,
-        user_id: Uuid,
-        action: AuthenticationAction,
-        code: &str,
-    ) -> anyhow::Result<()> {
-        let Some(challenge) = self
-            .auth_repo
-            .get_auth_challenge(user_id, action.clone())
-            .await?
-        else {
-            return Err(anyhow::anyhow!("challenge not found"));
-        };
-
-        if challenge.attempts >= MAX_ATTEMPTS_ALLOWED {
-            return Err(anyhow::anyhow!(
-                "too many attempts, please request a new code"
-            ));
-        }
-
-        if Utc::now() > challenge.expires_at {
-            return Err(anyhow::anyhow!("challenge expired"));
-        }
-
-        if !verify_verification_code(code, &challenge.code_hash, &self.pub_key)? {
-            self.auth_repo
-                .increase_auth_challenge_attempts(challenge.id)
-                .await?;
-            return Err(anyhow::anyhow!("invalid code"));
-        }
-
-        self.auth_repo
-            .confirm_authentication_challenge(user_id, action, Utc::now())
-            .await?;
-
-        Ok(())
-    }
-
     async fn issue_bundle(
         &self,
         user_id: Uuid,
@@ -350,7 +493,7 @@ impl AuthService {
         let access_token = self.jwt.sign(user_id, ver, self.access_ttl)?;
 
         let refresh_token = gen_refresh_token();
-        let refresh_hash = hash_refresh_token(&refresh_token, &self.pub_key)?;
+        let refresh_hash = hash_refresh_token(&refresh_token, self.pwd_pepper.expose_secret())?;
         let absolute_expires = Utc::now() + Duration::days(REFRESH_TTL_DAYS);
 
         let _ = self
@@ -362,6 +505,52 @@ impl AuthService {
             access_token,
             refresh_token,
         })
+    }
+
+    async fn authenticate_user(
+        &self,
+        usr: &crate::features::users::repositories::User,
+        password: &SecretString,
+        ip: IpAddr,
+        user_agent: Option<&str>,
+    ) -> anyhow::Result<()> {
+        match self.verify_password(usr.id, password).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.to_string().contains("invalid password") => {
+                self.handle_failed_signin(usr, ip, user_agent).await?;
+                anyhow::bail!("wrong email or password")
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    async fn handle_failed_signin(
+        &self,
+        usr: &crate::features::users::repositories::User,
+        ip: IpAddr,
+        user_agent: Option<&str>,
+    ) -> anyhow::Result<()> {
+        self.auth_repo
+            .add_sign_in_attempt(&usr.id, ip, &usr.email, false, user_agent)
+            .await?;
+
+        let should_lock = self
+            .auth_repo
+            .should_lock_user_for_failures(
+                &usr.id,
+                MAX_SIGNIN_ATTEMPTS_PER_USER,
+                MAX_USER_SIGNIN_ATTEMPT_WINDOW_MINS,
+                usr.fail_count_since,
+            )
+            .await?;
+
+        if should_lock {
+            let until = Utc::now() + Duration::hours(ACCOUNT_LOCK_HOURS);
+            self.users_repo.lock_user_until(usr.id, until).await?;
+            anyhow::bail!("account locked");
+        }
+
+        Ok(())
     }
 }
 
